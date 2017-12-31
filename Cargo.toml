@@ -1,0 +1,61 @@
+# Aldaron's System Interface / Vulkan                                          #
+# Copyright (c) 2017 Jeron Lau (Plop Grizzly) <jeron.lau@plopgrizzly.com>      #
+# Licensed under the MIT LICENSE                                               #
+#                             _        _                                       #
+#                            /@\——————/@\                                      #
+# .———  .                   |   o    o   |     .————      .            .       #
+# |   | |  .———   .———   .——.     []     .——.  |      .——    ———: ———: | .   . #
+# |   | |  |   |  |   |  \   \   <##>   /   /  |      |   |    /    /  | |   | #
+# |———  |  |   |  |   |   |   ¯        ¯   |   |   -- |   |   /    /   |  \ /  #
+# |     |  |   |  |———    |                |   |    | |   |  /    /    |   |   #
+# |     |   ———   |       |                |    ————  |   | :——— :———  |   |   #
+#                 |        \              /                              __/   #
+#                           ¯————————————¯                                     #
+# Cargo.toml                                                                   #
+
+################################################################################
+
+[package]
+name = "asi_vulkan"
+version = "0.1.0"
+authors = [
+	"Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>"
+]
+
+################################################################################
+
+license = "MIT"
+documentation = "https://docs.rs/asi_vulkan"
+homepage = "http://plopgrizzly.com/asi_vulkan"
+repository = "https://github.com/plopgrizzly/asi_vulkan"
+
+################################################################################
+
+readme = "README.md"
+description = """
+    Aldaron's System Interface / Vulkan is a library developed by Plop Grizzly
+    for interfacing with the Vulkan library.
+"""
+keywords = ["vulkan"]
+categories = ["rendering::graphics-api", "hardware-support",
+	"api-bindings", "rendering", "external-ffi-bindings"]
+
+################################################################################
+
+exclude = ["examples/*", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", ".gitignore"]
+
+################################################################################
+
+[dependencies]
+afi = "^0.3"
+ami = "^0.5"
+awi = { path = "../awi" }
+
+[build-dependencies.gcc]
+version = "0.3.50"
+
+[features]
+checks = []
+validation = []
+
+################################################################################
