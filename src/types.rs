@@ -1253,12 +1253,9 @@ pub enum VkPresentModeKHR {
 	LoaderInstanceCreateInfo = 47,
 	LoaderDeviceCreateInfo = 48,
 	SwapchainCreateInfo = 1000001000,
-	#[cfg(unix)]
-	SurfaceCreateInfo = 1000005000, // XCB
-	#[cfg(target_os = "windows")]
-	SurfaceCreateInfo = 1000009000, // Win32
-	#[cfg(target_os = "android")]
-	SurfaceCreateInfo = 1000008000, // Android
+	SurfaceCreateInfoXcb = 1000005000,
+	SurfaceCreateInfoWindows = 1000009000,
+	SurfaceCreateInfoAndroid = 1000008000,
 }
 
 #[repr(C)] #[allow(dead_code)] #[derive(PartialEq)]
