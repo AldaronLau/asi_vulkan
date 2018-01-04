@@ -32,23 +32,15 @@ const VERSION: (u32, &'static str) = (4194304, "vulkan 1.0.0");
 const VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT: VkFlags = 0x00000002;
 const VK_MEMORY_PROPERTY_HOST_COHERENT_BIT: VkFlags = 0x00000004;
 
-/*
 // Link to Kernel32
+#[cfg(target_os = "windows")]
 extern "system" {
-	fn HMODULE WINAPI LoadLibrary(
-		_In_ LPCTSTR lpFileName
-	);
+	fn LoadLibraryW(a: *const u16) -> *mut Void /*HMODULE*/;
+	fn GetProcAddress(b: *mut Void/*HMODULE*/, c: *const u8) -> *mut Void;
+	fn FreeLibrary(a: *mut Void/*HMODULE*/) -> i32 /*BOOL*/;
+}
 
-	fn FARPROC WINAPI GetProcAddress(
-		_In_ HMODULE hModule,
-		_In_ LPCSTR  lpProcName
-	);
-
-	fn BOOL WINAPI FreeLibrary(
-		_In_ HMODULE hModule
-	);
-} */
-
+#[cfg(not(target_os = "windows"))]
 #[link = "dl"]
 extern "C" {
 	fn dlopen(filename: *const i8, flag: i32) -> *mut Void;
@@ -211,11 +203,35 @@ pub struct VwInstance {
 	pub pipeline: Style,
 }
 
-pub unsafe fn load(app_name: &str) -> Connection {
+#[cfg(target_os = "windows")]
+unsafe fn load_lib() -> *mut Void {
+//	let vulkan = if cfg!(target_pointer_width = "64") {
+//		"C:\\Windows\\SysWOW64\\vulkan-1.dll";
+//	} else {
+//		"C:\\Windows\\System32\\vulkan-1.dll";
+//	}
+	let vulkan = "vulkan-1.dll\0";
+	let vulkan16 : Vec<u16> = vulkan.encode_utf16().collect();
+	let handle = LoadLibraryW(vulkan16.as_ptr());
+	
+	if handle.is_null() {
+		panic!("failed to load vulkan-1.dll")
+	} else {
+		handle
+	}
+}
+
+#[cfg(not(target_os = "windows"))]
+unsafe fn load_lib() -> *mut Void {
 	let vulkan = b"libvulkan.so.1\0";
 
-	let lib = dlopen(&vulkan[0] as *const _ as *const i8, 1);
+	dlopen(&vulkan[0] as *const _ as *const i8, 1)
+}
+
+pub unsafe fn load(app_name: &str) -> Connection {
+	let lib = load_lib();
 	let vksym = dl_sym(lib, b"vkGetInstanceProcAddr\0");
+	
 	let vk = create_instance(
 		vk_sym(mem::zeroed(), vksym, b"vkCreateInstance\0"), app_name
 	);
@@ -285,6 +301,14 @@ pub unsafe fn load(app_name: &str) -> Connection {
 	}
 }
 
+#[cfg(target_os = "windows")]
+unsafe fn dl_sym<T>(lib: *mut Void, name: &[u8]) -> T {
+	let fn_ptr = GetProcAddress(lib, &name[0]);
+
+	mem::transmute_copy::<*mut Void, T>(&fn_ptr)
+}
+
+#[cfg(not(target_os = "windows"))]
 unsafe fn dl_sym<T>(lib: *mut Void, name: &[u8]) -> T {
 	let fn_ptr = dlsym(lib, &name[0] as *const _ as *const i8);
 
@@ -297,6 +321,11 @@ unsafe fn vk_sym<T>(vk: VkInstance, vksym: unsafe extern "system" fn(
 {
 	let fn_ptr = vksym(vk, &name[0] as *const _ as *const i8);
 
+	if fn_ptr.is_null() {
+		panic!("couldn't load symbol {}!", std::str::from_utf8(name)
+			.unwrap());
+	}
+
 	mem::transmute_copy::<*mut Void, T>(&fn_ptr)
 }
 
@@ -304,6 +333,11 @@ unsafe fn vkd_sym<T>(device: VkDevice, vkdsym: unsafe extern "system" fn(
 	VkDevice, *const i8) -> *mut Void, name: &[u8]) -> T
 {
 	let fn_ptr = vkdsym(device, &name[0] as *const _ as *const i8);
+
+	if fn_ptr.is_null() {
+		panic!("couldn't load symbol {}!", std::str::from_utf8(name)
+			.unwrap());
+	}
 
 	mem::transmute_copy::<*mut Void, T>(&fn_ptr)
 }
@@ -472,7 +506,7 @@ pub unsafe fn get_gpu(connection: &Connection, instance: VkInstance,
 pub unsafe fn create_device(connection: &Connection, gpu: VkPhysicalDevice,
 	pqi: u32) -> VkDevice
 {
-	#[repr(C)]
+	#[derive(Debug)] #[repr(C)]
 	struct VkDeviceQueueCreateInfo {
 		s_type: VkStructureType,
 		p_next: *mut Void,
@@ -482,7 +516,7 @@ pub unsafe fn create_device(connection: &Connection, gpu: VkPhysicalDevice,
 		p_queue_priorities: *const f32,
 	}
 
-	#[repr(C)]
+	#[derive(Debug)] #[repr(C)]
 	struct VkDeviceCreateInfo {
 		s_type: VkStructureType,
 		p_next: *mut Void,
@@ -490,9 +524,9 @@ pub unsafe fn create_device(connection: &Connection, gpu: VkPhysicalDevice,
 		queue_create_info_count: u32,
 		p_queue_create_infos: *const VkDeviceQueueCreateInfo,
 		enabled_layer_count: u32,
-		enabled_layer_names: *const *const i8,
+		enabled_layer_names: *const *const u8,
 		enabled_extension_count: u32,
-		enabled_extension_names: *const *const i8,
+		enabled_extension_names: *const *const u8,
 		enabled_features: *mut Void,
 	}
 
@@ -505,41 +539,30 @@ pub unsafe fn create_device(connection: &Connection, gpu: VkPhysicalDevice,
 	let vk_create_device: VkCreateDevice = sym(connection,
 		b"vkCreateDevice\0");
 
-	// Set Data
-	let validation = CString::new("VK_LAYER_LUNARG_standard_validation")
-		.unwrap();
-
 	let mut device = mem::uninitialized();
-	let ext = CString::new("VK_KHR_swapchain").unwrap();
-	let create_info = VkDeviceCreateInfo {
+	let ext = b"VK_KHR_swapchain\0";
+
+	println!("z");
+	vk_create_device(gpu, &VkDeviceCreateInfo {
 		s_type: VkStructureType::DeviceCreateInfo,
 		p_next: null_mut!(),
 		flags: 0,
 		queue_create_info_count: 1,
-		p_queue_create_infos: &VkDeviceQueueCreateInfo {
+		p_queue_create_infos: [VkDeviceQueueCreateInfo {
 			s_type: VkStructureType::DeviceQueueCreateInfo,
 			p_next: null_mut!(),
 			flags: 0,
 			queue_family_index: pqi,
 			queue_count: 1,
 			p_queue_priorities: &1.0,
-		},
-		enabled_layer_count: {
-			if cfg!(feature = "checks") { 1 } else { 0 }
-		},
-		enabled_layer_names: {
-			if cfg!(feature = "checks") {
-				&validation.as_ptr()
-			} else {
-				ptr::null()
-			}
-		},
+		}].as_ptr(),
+		enabled_layer_count: 0,
+		enabled_layer_names: null!(),
 		enabled_extension_count: 1,
-		enabled_extension_names: &ext.as_ptr(),
+		enabled_extension_names: [ext.as_ptr()].as_ptr(),
 		enabled_features: null_mut!(),
-	};
-
-	vk_create_device(gpu, &create_info, null_mut!(), &mut device).unwrap();
+	}, null_mut!(), &mut device).unwrap();
+	println!("ZZ");
 
 	device
 }

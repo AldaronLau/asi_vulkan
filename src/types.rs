@@ -1203,7 +1203,7 @@ pub enum VkPresentModeKHR {
 	Astc12x12SrgbBlock = 184,
 }
 
-#[repr(C)] #[allow(dead_code)] pub enum VkStructureType {
+#[derive(Debug)] #[repr(C)] #[allow(dead_code)] pub enum VkStructureType {
 	ApplicationInfo = 0,
 	InstanceCreateInfo = 1,
 	DeviceQueueCreateInfo = 2,
