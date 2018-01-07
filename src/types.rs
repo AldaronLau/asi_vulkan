@@ -1,5 +1,5 @@
-// Aldaron's Device Interface / GPU
-// Copyright (c) 2017 Plop Grizzly, Jeron Lau <jeron.lau@plopgrizzly.com>
+// Aldaron's System Interface / Vulkan
+// Copyright (c) 2017-2018 Jeron Lau <jeron.lau@plopgrizzly.com>
 // Licensed under the MIT LICENSE
 //
 // src/renderer/ffi/vulkan/ffi/types.rs

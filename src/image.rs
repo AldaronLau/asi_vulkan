@@ -1,3 +1,9 @@
+// Aldaron's System Interface / Vulkan
+// Copyright (c) 2017 Jeron Lau <jeron.lau@plopgrizzly.com>
+// Licensed under the MIT LICENSE
+//
+// src/image.rs
+
 use std::mem;
 use ami::Void;
 

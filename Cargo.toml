@@ -1,5 +1,5 @@
 # Aldaron's System Interface / Vulkan                                          #
-# Copyright (c) 2017 Jeron Lau (Plop Grizzly) <jeron.lau@plopgrizzly.com>      #
+# Copyright (c) 2017-2018 Jeron Lau <jeron.lau@plopgrizzly.com>                #
 # Licensed under the MIT LICENSE                                               #
 #                             _        _                                       #
 #                            /@\——————/@\                                      #
@@ -42,14 +42,16 @@ categories = ["rendering::graphics-api", "hardware-support",
 
 ################################################################################
 
-exclude = ["examples/*", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", ".gitignore"]
+exclude = [
+	"examples/*", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", ".gitignore",
+	"_config.yml", "ISSUE_TEMPLATE.md", "icon.png", "icon.ico"
+]
 
 ################################################################################
 
 [dependencies]
 afi = "^0.3"
 ami = "^0.5"
-awi = { path = "../awi" }
 
 [build-dependencies.gcc]
 version = "0.3.50"
