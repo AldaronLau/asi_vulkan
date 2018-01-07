@@ -63,7 +63,6 @@ impl Buffer {
 	/// Called by `Memory`'s drop()
 	#[inline(always)]
 	pub fn drop(&mut self, device: VkDevice) {
-		println!("Drop {:x}", self.buffer.0);
 		unsafe {
 			(self.dropfn)(device, self.buffer, ptr::null());
 		}

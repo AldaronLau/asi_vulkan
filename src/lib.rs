@@ -382,8 +382,6 @@ unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
 	let layernames = [validation.as_ptr(), dump.as_ptr()];
 
 	let mut instance = mem::uninitialized();
-
-	println!("{:?} {:?}", vk_create_instance as *const Void, null_mut!() as *mut Void);
 	
 	vk_create_instance(
 		&VkInstanceCreateInfo {
@@ -546,7 +544,6 @@ pub unsafe fn create_device(connection: &Connection, gpu: VkPhysicalDevice,
 	let mut device = mem::uninitialized();
 	let ext = b"VK_KHR_swapchain\0";
 
-	println!("z");
 	vk_create_device(gpu, &VkDeviceCreateInfo {
 		s_type: VkStructureType::DeviceCreateInfo,
 		p_next: null_mut!(),
@@ -566,7 +563,6 @@ pub unsafe fn create_device(connection: &Connection, gpu: VkPhysicalDevice,
 		enabled_extension_names: [ext.as_ptr()].as_ptr(),
 		enabled_features: null_mut!(),
 	}, null_mut!(), &mut device).unwrap();
-	println!("ZZ");
 
 	device
 }
@@ -817,10 +813,8 @@ pub unsafe fn cmd_draw(connection: &Connection, cmd_buf: VkCommandBuffer,
 	nvertices: u32, ninstances: u32, firstvertex: u32, vertex_offset: i32,
 	firstinstance: u32) -> ()
 {
-	println!("Drawing....");
 	(connection.draw)(cmd_buf, nvertices, ninstances, firstvertex,
 		vertex_offset, firstinstance);
-	println!("Drawed");
 }
 
 pub unsafe fn new_semaphore(connection: &Connection, device: VkDevice)
@@ -1426,8 +1420,6 @@ impl DescriptorSetWriter {
 	/// Create a new DescriptorSetWriter.
 	#[inline(always)]
 	pub fn new() -> Self {
-		println!("WRITER");
-
 		Self {
 			sets: unsafe { mem::uninitialized() },
 			nwrites: 0,
@@ -1440,8 +1432,6 @@ impl DescriptorSetWriter {
 		memory: &Memory<T>) -> Self
 		where T: Clone
 	{
-		println!("UNIFORM {:x}", memory.buffer.buffer.0);
-
 		self.sets[self.nwrites as usize] = Set::Uniform(desc_set, memory.buffer.buffer);
 
 		self.nwrites += 1;
@@ -1460,8 +1450,6 @@ impl DescriptorSetWriter {
 	pub fn sampler(mut self, desc_set: VkDescriptorSet,
 		tex_sampler: VkSampler, tex_view: VkImageView) -> Self
 	{
-		println!("SAMPLER {:?}", desc_set);
-		
 		self.sets[self.nwrites as usize] = Set::Sampler(desc_set, tex_sampler, tex_view);
 
 		self.nwrites += 1;
@@ -1483,13 +1471,10 @@ impl DescriptorSetWriter {
 		let mut writes: [VkWriteDescriptorSet; 255] = unsafe {
 			mem::uninitialized()
 		};
-		
-		println!("{}", self.nwrites);
-		
+
 		for i in 0..self.nwrites {
 			match self.sets[i as usize] {
 				Set::Sampler(desc_set, tex_sampler, tex_view) => {
-					println!("ZZ SAMPLER");
 					image_infos[i as usize] = VkDescriptorImageInfo {
 						sampler: tex_sampler,
 						image_view: tex_view,
@@ -1508,9 +1493,7 @@ impl DescriptorSetWriter {
 						texel_buffer_view: ptr::null(),
 					};
 				}
-				Set::Uniform(desc_set, buffer) => {
-					println!("ZZ UNIF");
-				
+				Set::Uniform(desc_set, buffer) => {				
 					buffer_infos[i as usize] = VkDescriptorBufferInfo {
 						buffer: buffer,
 						offset: 0,
@@ -1532,14 +1515,6 @@ impl DescriptorSetWriter {
 			}
 		}
 
-		println!("PRE-UPDATING descset...");
-/*		for i in 0..self.nwrites {
-			println!("Z {} {:?}", i, writes[i as usize].buffer_info);
-			unsafe {
-				println!("{:x}", (*writes[i as usize].buffer_info).buffer.0);
-			}
-		}*/
-		println!("UPDATING descset...");
 		unsafe {
 			(connection.update_descsets)(
 				device,
@@ -1549,7 +1524,6 @@ impl DescriptorSetWriter {
 				ptr::null(),
 			);
 		}
-		println!("UPDATED descsets");
 	}
 }
 
