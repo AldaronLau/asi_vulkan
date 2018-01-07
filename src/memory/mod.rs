@@ -98,6 +98,8 @@ impl<T> Memory<T> where T: Clone {
 				-> ::ami::MemAddr<Void>;
 		}*/
 
+		println!("Unmapping.... {:x}",  self.buffer.buffer.0);
+		
 		unsafe {
 	//		memcpy(mapped, cast!(&self.data), size);
 	//		ptr::copy_nonoverlapping(data.as_ptr(), mapped, data.len());
@@ -106,6 +108,8 @@ impl<T> Memory<T> where T: Clone {
 
 //			asi_vulkan::unmap_memory(c, self.device, self.memory);
 		}
+		
+		println!("Unmapp'd.... {:x}", self.buffer.buffer.0);
 	}
 
 	#[inline(always)]

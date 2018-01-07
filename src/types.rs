@@ -22,7 +22,7 @@ pub type VkSampleMask = u32;
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkFence(u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSemaphore(u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkImageView(u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkBuffer(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkBuffer(pub u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkShaderModule(u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipeline(u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorSetLayout(u64);
@@ -638,7 +638,7 @@ pub type VkSampleMask = u32;
 	pub api_version: u32,
 }
 
-#[repr(C)] pub struct VkInstanceCreateInfo {
+#[derive(Debug)] #[repr(C)] pub struct VkInstanceCreateInfo {
 	pub s_type: VkStructureType,
 	pub p_next: *mut Void,
 	pub flags: u32,
