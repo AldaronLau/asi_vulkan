@@ -20,7 +20,7 @@ for interfacing safely with Vulkan in Rust.
 * Unix
 * Windows
 
-**adi_clock**'s planned support:
+**asi_vulkan**'s planned support:
 * Raspberry Pi (no os)
 
 # Contributing
