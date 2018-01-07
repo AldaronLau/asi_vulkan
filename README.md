@@ -1,37 +1,29 @@
-## Welcome to GitHub Pages
+# Aldaron's System Interface / Vulkan (adi_clock 0.3.0)
 
-You can use the [editor on GitHub](https://github.com/plopgrizzly/asi_vulkan/edit/master/README.md) to maintain and preview the content for your website in Markdown files.
+Aldaron's Device Interface / Vulkan is a library developed by Plop Grizzly
+for 
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+[Cargo](https://crates.io/crates/asi_vulkan) /
+[Documentation](https://docs.rs/asi_vulkan)
 
-### Markdown
+## Features
+**asi_vulkan**'s current features:
+* Safe bindings to some Vulkan calls
+* Unsafe bindings to some Vulkan calls
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+**asi_vulkan**'s planned features:
+* All bindings to Vulkan calls are safe
+* More bindings
 
-```markdown
-Syntax highlighted code block
+## Support
+**asi_vulkan**'s current support:
+* Unix
+* Windows
 
-# Header 1
-## Header 2
-### Header 3
+**adi_clock**'s planned support:
+* Raspberry Pi (no os)
 
-- Bulleted
-- List
-
-1. Numbered
-2. List
-
-**Bold** and _Italic_ and `Code` text
-
-[Link](url) and ![Image](src)
-```
-
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
-
-### Jekyll Themes
-
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/plopgrizzly/asi_vulkan/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
-
-### Support or Contact
-
-Having trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we’ll help you sort it out.
+# Contributing
+If you'd like to help implement functions for unsupported platforms, fix bugs,
+improve the API or improve the Documentation, then contact me at
+jeron.lau@plopgrizzly.com. I'll appreciate any help.
