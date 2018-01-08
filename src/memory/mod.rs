@@ -1,5 +1,5 @@
 // Aldaron's System Interface / Vulkan
-// Copyright (c) 2017-2018 Jeron Lau <jeron.lau@plopgrizzly.com>
+// Copyright (c) 2017-2018 Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>
 // Licensed under the MIT LICENSE
 //
 // src/memory/mod.rs
