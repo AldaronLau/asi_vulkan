@@ -1383,7 +1383,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	frame_buffers: &[VkFramebuffer], present_imgviews: &[VkImageView],
 	depth_imgview: VkImageView, render_pass: VkRenderPass, image_count: u32,
 	depth_image: VkImage, swapchain: VkSwapchainKHR,
-	depth_image_memory: VkDeviceMemory)
+	_/*depth_image_memory*/: VkDeviceMemory)
 {
 	// Free framebuffers & image view #1
 	for i in 0..(image_count as usize) {
@@ -2145,9 +2145,9 @@ pub fn new_pipeline(connection: &Connection,
 }}
 
 pub unsafe fn destroy_uniforms(connection: &Connection,
-	device: VkDevice, uniform_memory: VkDeviceMemory,
+	device: VkDevice, _/*uniform_memory*/: VkDeviceMemory,
 	desc_set: VkDescriptorSet, desc_pool: VkDescriptorPool,
-	uniform_buffer: VkBuffer) -> ()
+	_/*uniform_buffer*/: VkBuffer) -> ()
 {
 //	(connection.drop_memory)(device, uniform_memory, ptr::null());
 	(connection.drop_descsets)(device, desc_pool, 1, &desc_set).unwrap();

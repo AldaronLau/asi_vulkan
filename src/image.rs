@@ -15,9 +15,12 @@ use get_memory_type;
 pub struct Image {
 	pub image: VkImage,
 	pub image_memory: VkDeviceMemory,
+	#[allow(unused)] // TODO
 	device: VkDevice,
+	#[allow(unused)] // TODO
 	drop_image: unsafe extern "system" fn(VkDevice, VkImage, *const Void)
 		-> (),
+	#[allow(unused)] // TODO
 	drop_memory: unsafe extern "system" fn(VkDevice, VkDeviceMemory,
 		*const Void) -> (),
 }
@@ -97,10 +100,10 @@ impl Drop for Image {
 	fn drop(&mut self) {
 		// TODO: image & image_memory are being moved, dropping the
 		// Image - causing them to be invalid
-		unsafe {
+//		unsafe {
 //			(self.drop_image)(self.device, self.image, null!());
 //			(self.drop_memory)(self.device, self.image_memory,
 //				null!());
-		}
+//		}
 	}
 }

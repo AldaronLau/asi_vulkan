@@ -18,7 +18,9 @@ pub struct Memory<T> where T: Clone {
 	pub data: T,
 	pub memory: VkDeviceMemory,
 	pub buffer: buffer::Buffer,
+	#[allow(unused)] // TODO
 	device: VkDevice,
+	#[allow(unused)] // TODO
 	dropfn: unsafe extern "system" fn(VkDevice, VkDeviceMemory, *const Void)
 		-> ()
 }
@@ -69,7 +71,6 @@ impl<T> Memory<T> where T: Clone {
 	/// Update the contents of the memory.
 	#[inline(always)]
 	pub fn update(&self, c: &Connection) {
-		let size = mem::size_of::<T>();
 		let mut mapped: *mut T = unsafe { mem::uninitialized() }; // void *
 
 		unsafe {
