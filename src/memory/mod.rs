@@ -4,7 +4,8 @@
 //
 // src/memory/mod.rs
 
-mod buffer;
+// TODO: pub?
+pub mod buffer;
 
 use std::{ mem, ptr };
 use ami::Void;
@@ -31,7 +32,8 @@ impl<T> Memory<T> where T: Clone {
 	pub fn new(c: &Connection, device: VkDevice, gpu: VkPhysicalDevice,
 		data: T) -> Memory<T>
 	{
-		let buffer = buffer::Buffer::new(c, device, mem::size_of::<T>());
+		let buffer = buffer::Buffer::new(c, device, mem::size_of::<T>(),
+			buffer::BufferBuilderType::Uniform);
 		let mut memory = unsafe { mem::uninitialized() };
 		let mem_reqs = buffer.get_reqs(c, device);
 		unsafe {

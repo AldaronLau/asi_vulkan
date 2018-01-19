@@ -964,7 +964,8 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 
 	// Set Data
 	let npresentmodes_usize = npresentmodes as usize;
-	let mut present_modes = vec![mem::uninitialized(); npresentmodes_usize];
+	let mut present_modes = vec![VkPresentModeKHR::Immediate;
+		npresentmodes_usize];
 
 	// Run Function
 	vk_get_present_modes(gpu, surface, &mut npresentmodes,
@@ -1663,6 +1664,9 @@ pub unsafe fn new_shape(connection: &Connection, device: VkDevice,
 	let mut vb_memreqs = mem::uninitialized();
 
 	// Create Vertex Buffer
+//	let buffer = memory::buffer::Buffer::new(connection, device, size,
+//		BufferBuilderType::Vertex);
+
 	// TODO: Use `Buffer` Type
 	(connection.new_buffer)(
 		device,

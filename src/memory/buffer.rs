@@ -10,6 +10,11 @@ use ami::Void;
 use super::Connection;
 use super::super::types::*;
 
+pub enum BufferBuilderType {
+	Uniform,
+	Vertex,
+}
+
 /// A buffer in GPU memory.
 pub struct Buffer {
 	pub buffer: VkBuffer,
@@ -19,7 +24,9 @@ pub struct Buffer {
 impl Buffer {
 	/// Create a new buffer on the GPU.
 	#[inline(always)]
-	pub fn new(c: &Connection, device: VkDevice, nbytes: usize) -> Buffer {
+	pub fn new(c: &Connection, device: VkDevice, nbytes: usize,
+		bbt: BufferBuilderType) -> Buffer
+	{
 		let mut buffer = unsafe { mem::uninitialized() };
 		unsafe {
 			(c.new_buffer)(
@@ -29,7 +36,12 @@ impl Buffer {
 					next: ptr::null(),
 					flags: 0,
 					size: nbytes as u64,
-					usage: VkBufferUsage::UniformBufferBit,
+					usage: match bbt {
+					  BufferBuilderType::Uniform =>
+					    VkBufferUsage::UniformBufferBit,
+					  BufferBuilderType::Vertex =>
+					    VkBufferUsage::VertexIndexBufferBit,
+					},
 					sharing_mode: VkSharingMode::Exclusive,
 					queue_family_index_count: 0,
 					queue_family_indices: ptr::null(),
