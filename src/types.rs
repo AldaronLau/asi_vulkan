@@ -701,6 +701,7 @@ pub type VkSampleMask = u32;
 	Compute = 0x00000020,
 	AllGraphics = 0x0000001f,
 	All = 0x7fffffff,
+	VertexAndFragment = 0x00000001 | 0x00000010,
 }
 
 #[repr(C)] #[allow(dead_code)] pub enum VkVertexInputRate {
