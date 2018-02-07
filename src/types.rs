@@ -39,6 +39,16 @@ pub type VkSampleMask = u32;
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkCommandBuffer(*mut Void);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkQueue(*mut Void);
 
+#[repr(C)] pub struct VkRenderPassBeginInfo {
+	pub s_type: VkStructureType,
+	pub p_next: *const Void,
+	pub render_pass: VkRenderPass,
+	pub framebuffer: VkFramebuffer,
+	pub render_area: VkRect2D,
+	pub clear_value_count: u32,
+	pub p_clear_values: *const VkClearValue,
+}
+
 #[repr(C)] pub struct VkSubresourceLayout {
 	pub offset: VkDeviceSize,
 	pub size: VkDeviceSize,
@@ -649,6 +659,42 @@ pub type VkSampleMask = u32;
 	pub pp_enabled_extension_names: *const *const i8,
 }
 
+#[derive(Copy, Clone)] #[repr(C)]
+pub struct VkClearDepthStencilValue {
+	pub depth: f32,
+	pub stencil: u32,
+}
+
+#[repr(C)]
+pub struct VkPresentInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub wait_semaphore_count: u32,
+	pub wait_semaphores: *const VkSemaphore,
+	pub swapchain_count: u32,
+	pub swapchains: *const VkSwapchainKHR,
+	pub image_indices: *const u32,
+	pub results: *mut VkResult,
+}
+
+#[derive(Copy, Clone)] #[repr(C)]
+pub union VkClearColorValue  {
+	pub float32: [f32; 4],
+	pub int32: [i32; 4],
+	pub uint32: [u32; 4],
+}
+
+#[derive(Copy, Clone)] #[repr(C)]
+pub union VkClearValue {
+	pub color: VkClearColorValue,
+	pub depth_stencil: VkClearDepthStencilValue,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkSubpassContents {
+	Inline = 0,
+	SecondaryCommandBuffers = 1,
+}
+
 #[repr(C)] #[allow(dead_code)] pub enum VkIndexType {
 	Uint16 = 0,
 	Uint32 = 1,
@@ -898,6 +944,7 @@ pub type VkSampleMask = u32;
 	MemoryWriteBit = 0x00010000,
 	// OR'D FLAGS
 	DepthStencilAttachmentReadWrite = 0x00000200 | 0x00000400,
+	ColorAttachmentReadWrite = 0x00000080 | 0x00000100,
 }
 
 #[repr(C)] #[allow(dead_code)] pub enum VkImageLayout {
@@ -1257,6 +1304,7 @@ pub enum VkPresentModeKHR {
 	SurfaceCreateInfoXcb = 1000005000,
 	SurfaceCreateInfoWindows = 1000009000,
 	SurfaceCreateInfoAndroid = 1000008000,
+	PresentInfo = 1000001001,
 }
 
 #[repr(C)] #[allow(dead_code)] #[derive(PartialEq)]

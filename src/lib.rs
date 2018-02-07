@@ -14,11 +14,13 @@ pub mod memory;
 
 mod depth_buffer;
 mod image;
+mod surface;
 
 // Export Types
 pub use self::memory::Memory;
 pub use self::depth_buffer::DepthBuffer;
 pub use self::image::Image;
+pub use self::surface::{ create_surface_windows, create_surface_xcb };
 
 //
 use self::types::*;
@@ -171,7 +173,18 @@ pub struct Connection {
 		*const VkSamplerCreateInfo, *const Void, *mut VkSampler)
 		-> VkResult,
 	get_surface_capabilities: unsafe extern "system" fn(VkPhysicalDevice,
-		VkSurfaceKHR, *mut VkSurfaceCapabilitiesKHR) -> VkResult
+		VkSurfaceKHR, *mut VkSurfaceCapabilitiesKHR) -> VkResult,
+	begin_render: unsafe extern "system" fn(VkCommandBuffer,
+		*const VkRenderPassBeginInfo, VkSubpassContents) -> (),
+	set_viewport: unsafe extern "system" fn(VkCommandBuffer, u32, u32,
+		*const VkViewport) -> (),
+	set_scissor: unsafe extern "system" fn(VkCommandBuffer, u32, u32,
+		*const VkRect2D) -> (),
+	end_render_pass: unsafe extern "system" fn(VkCommandBuffer) -> (),
+	destroy_fence: unsafe extern "system" fn(VkDevice, VkFence, *const Void)
+		-> (),
+	queue_present: unsafe extern "system" fn(VkQueue, *const VkPresentInfo) -> VkResult,
+	wait_idle: unsafe extern "system" fn(VkDevice) -> VkResult,
 }
 
 // TODO
@@ -298,6 +311,13 @@ pub unsafe fn load(app_name: &str) -> Connection {
 		new_sampler: vk_sym(vk, vksym, b"vkCreateSampler\0"),
 		get_surface_capabilities: vk_sym(vk, vksym,
 			b"vkGetPhysicalDeviceSurfaceCapabilitiesKHR\0"),
+		begin_render: vk_sym(vk, vksym, b"vkCmdBeginRenderPass\0"),
+		set_viewport: vk_sym(vk, vksym, b"vkCmdSetViewport\0"),
+		set_scissor: vk_sym(vk, vksym, b"vkCmdSetScissor\0"),
+		end_render_pass: vk_sym(vk, vksym, b"vkCmdEndRenderPass\0"),
+		destroy_fence: vk_sym(vk, vksym, b"vkDestroyFence\0"),
+		queue_present: vk_sym(vk, vksym, b"vkQueuePresentKHR\0"),
+		wait_idle: vk_sym(vk, vksym, b"vkDeviceWaitIdle\0"),
 	}
 }
 
@@ -587,6 +607,27 @@ pub unsafe fn create_queue(connection: &Connection, device: VkDevice, pqi: u32)
 	queue
 }
 
+pub unsafe fn queue_present(connection: &Connection, queue: VkQueue,
+	semaphore: VkSemaphore, swapchain: VkSwapchainKHR, next: u32)
+{
+	let present_info = VkPresentInfo {
+		s_type: VkStructureType::PresentInfo,
+		next: ptr::null(),
+		wait_semaphore_count: 1,
+		wait_semaphores: &semaphore,
+		swapchain_count: 1,
+		swapchains: &swapchain,
+		image_indices: &next,
+		results: ptr::null_mut(),
+	};
+
+	(connection.queue_present)(queue, &present_info).unwrap()
+}
+
+pub unsafe fn wait_idle(connection: &Connection, device: VkDevice) {
+	(connection.wait_idle)(device).unwrap();
+}
+
 pub unsafe fn create_command_buffer(connection: &Connection, device: VkDevice,
 	pqi: u32) -> (VkCommandBuffer, u64)
 {
@@ -846,6 +887,120 @@ pub unsafe fn drop_semaphore(connection: &Connection, device: VkDevice,
 	);
 }
 
+pub unsafe fn draw_begin(connection: &Connection,
+	command_buffer: VkCommandBuffer, render_pass: VkRenderPass,
+	image: VkImage, frame_buffer: VkFramebuffer, width: u32,
+	height: u32, r: f32, g: f32, b: f32)
+{
+	let begin_info = VkCommandBufferBeginInfo {
+		s_type: VkStructureType::CommandBufferBeginInfo,
+		p_next: ptr::null(),
+		flags: VkCommandBufferUsage::OneTimeSubmitBit,
+		p_inheritance_info: ptr::null(),
+	};
+
+	(connection.begin_cmdbuff)(command_buffer, &begin_info).unwrap();
+
+	let layout_transition_barrier = VkImageMemoryBarrier {
+		s_type: VkStructureType::ImageMemoryBarrier,
+		p_next: ptr::null(),
+		src_access_mask: VkAccess::MemoryReadBit,
+		dst_access_mask: VkAccess::ColorAttachmentReadWrite,
+		old_layout: VkImageLayout::PresentSrc,
+		new_layout: VkImageLayout::ColorAttachmentOptimal,
+		src_queue_family_index: !0,
+		dst_queue_family_index: !0,
+		image: image,
+		subresource_range: VkImageSubresourceRange {
+			aspect_mask: VkImageAspectFlags::Color,
+			base_mip_level: 0,
+			level_count: 1,
+			base_array_layer: 0,
+			layer_count: 1,
+		},
+	};
+
+	(connection.pipeline_barrier)(
+		command_buffer,
+		VkPipelineStage::TopOfPipe, 
+		VkPipelineStage::TopOfPipeAndColorAttachmentOutput, 
+		0, 0, ptr::null(), 0, ptr::null(), 1, &layout_transition_barrier);
+
+	// activate render pass:
+	let clear_value = [
+		VkClearValue { color: VkClearColorValue { float32: [r, g, b, 1.0] } },
+		VkClearValue { depth_stencil: VkClearDepthStencilValue { depth: 1.0, stencil: 0 } },
+	];
+
+	let render_pass_begin_info = VkRenderPassBeginInfo {
+		s_type: VkStructureType::RenderPassBeginInfo,
+		p_next: ptr::null(),
+		render_pass: render_pass,
+		framebuffer: frame_buffer,
+		render_area: VkRect2D {
+			offset: VkOffset2D { x: 0, y: 0 },
+			extent: VkExtent2D { width, height },
+		},
+		clear_value_count: clear_value.len() as u32,
+		p_clear_values: clear_value.as_ptr(),
+	};
+	(connection.begin_render)(command_buffer, &render_pass_begin_info,
+		VkSubpassContents::Inline);
+
+	// take care of dynamic state:
+	let viewport = VkViewport {
+		x: 0.0, y: 0.0,
+		width: width as f32,
+		height: height as f32,
+		min_depth: 0.0,
+		max_depth: 1.0,
+	};
+
+	(connection.set_viewport)(command_buffer, 0, 1, &viewport);
+
+	let scissor = VkRect2D {
+		offset: VkOffset2D { x: 0, y: 0 },
+		extent: VkExtent2D { width, height },
+	};
+
+	(connection.set_scissor)(command_buffer, 0, 1, &scissor);
+}
+
+pub unsafe fn end_render_pass(connection: &Connection,
+	command_buffer: VkCommandBuffer)
+{
+	(connection.end_render_pass)(command_buffer);
+}
+
+pub unsafe fn pipeline_barrier(connection: &Connection,
+	command_buffer: VkCommandBuffer, image: VkImage)
+{
+	let barrier = VkImageMemoryBarrier {
+		s_type: VkStructureType::ImageMemoryBarrier,
+		p_next: ptr::null(),
+		src_access_mask: VkAccess::ColorAttachmentWriteBit,
+		dst_access_mask: VkAccess::MemoryReadBit,
+		old_layout: VkImageLayout::ColorAttachmentOptimal,
+		new_layout: VkImageLayout::PresentSrc,
+		src_queue_family_index: !0,
+		dst_queue_family_index: !0,
+		image: image,
+		subresource_range: VkImageSubresourceRange {
+			aspect_mask: VkImageAspectFlags::Color,
+			base_mip_level: 0,
+			level_count: 1,
+			base_array_layer: 0,
+			layer_count: 1,
+		},
+	};
+
+	(connection.pipeline_barrier)(
+		command_buffer,
+		VkPipelineStage::AllCommands, 
+		VkPipelineStage::BottomOfPipe, 
+		0, 0, ptr::null(), 0, ptr::null(), 1, &barrier);
+}
+
 pub unsafe fn get_next_image(connection: &Connection, device: VkDevice,
 	presenting_complete_sem: &mut VkSemaphore, swapchain: VkSwapchainKHR)
 	-> u32
@@ -1103,12 +1258,17 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	image_view
 }
 
-#[inline(always)] pub unsafe fn create_image_view(
-	connection: &Connection, device: VkDevice, color_format: &VkFormat,
-	submit_fence: &mut VkFence, image_count: u32,
-	swap_images: &mut [VkImage; 2], image_views: &mut [VkImageView; 2],
-	command_buffer: VkCommandBuffer, present_queue: VkQueue)
+pub unsafe fn end_cmdbuff(connection: &Connection,
+	command_buffer: VkCommandBuffer)
 {
+	(connection.end_cmdbuff)(command_buffer).unwrap();
+}
+
+pub unsafe fn create_fence(connection: &Connection, device: VkDevice)
+	-> VkFence
+{
+	let mut fence = mem::uninitialized();
+
 	(connection.create_fence)(
 		device,
 		&VkFenceCreateInfo {
@@ -1117,8 +1277,55 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 			flags: 0,
 		},
 		ptr::null(),
+		&mut fence
+	).unwrap();
+
+	fence
+}
+
+pub unsafe fn fence_drop(connection: &Connection, device: VkDevice,
+	fence: VkFence)
+{
+	(connection.destroy_fence)(
+		device, fence, ptr::null()
+	);
+}
+
+pub unsafe fn queue_submit(connection: &Connection,
+	command_buffer: VkCommandBuffer, submit_fence: VkFence,
+	pipelane_stage: VkPipelineStage, queue: VkQueue)
+{
+	(connection.queue_submit)(
+		queue,
+		1,
+		&VkSubmitInfo {
+			s_type: VkStructureType::SubmitInfo,
+			p_next: ptr::null(),
+			wait_semaphore_count: 0,
+			wait_semaphores: ptr::null(),
+			wait_dst_stage_mask: &pipelane_stage,
+			command_buffer_count: 1,
+			p_command_buffers: &command_buffer,
+			signal_semaphore_count: 0,
+			p_signal_semaphores: ptr::null(),
+		},
 		submit_fence
 	).unwrap();
+}
+
+pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
+	fence: VkFence)
+{
+	(connection.wait_fence)(device, 1, &fence, 1, u64::MAX).unwrap();
+}
+
+#[inline(always)] pub unsafe fn create_image_view(
+	connection: &Connection, device: VkDevice, color_format: &VkFormat,
+	submit_fence: &mut VkFence, image_count: u32,
+	swap_images: &mut [VkImage; 2], image_views: &mut [VkImageView; 2],
+	command_buffer: VkCommandBuffer, present_queue: VkQueue)
+{
+	*submit_fence = create_fence(connection, device);
 
 	for i in 0..(image_count as usize) {
 		(connection.begin_cmdbuff)(
@@ -1156,28 +1363,11 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 			}
 		);
 
-		(connection.end_cmdbuff)(command_buffer).unwrap();
+		end_cmdbuff(connection, command_buffer);
+		queue_submit(connection, command_buffer, *submit_fence,
+			VkPipelineStage::ColorAttachmentOutput, present_queue);
+		wait_fence(connection, device, *submit_fence);
 
-		(connection.queue_submit)(
-			present_queue,
-			1,
-			&VkSubmitInfo {
-				s_type: VkStructureType::SubmitInfo,
-				p_next: ptr::null(),
-				wait_semaphore_count: 0,
-				wait_semaphores: ptr::null(),
-				wait_dst_stage_mask:
-					&VkPipelineStage::ColorAttachmentOutput,
-				command_buffer_count: 1,
-				p_command_buffers: &command_buffer,
-				signal_semaphore_count: 0,
-				p_signal_semaphores: ptr::null(),
-			},
-			*submit_fence
-		).unwrap();
-
-		(connection.wait_fence)(device, 1, submit_fence, 1, u64::MAX)
-			.unwrap();
 		(connection.reset_fence)(device, 1, submit_fence).unwrap();
 		(connection.reset_cmdbuff)(command_buffer, 0);
 
@@ -1241,27 +1431,11 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 		}
 	);
 
-	(connection.end_cmdbuff)(command_buffer).unwrap();
+	end_cmdbuff(connection, command_buffer);
+	queue_submit(connection, command_buffer, submit_fence,
+			VkPipelineStage::ColorAttachmentOutput, present_queue);
+	wait_fence(connection, device, submit_fence);
 
-	(connection.queue_submit)(
-		present_queue,
-		1,
-		&VkSubmitInfo {
-			s_type: VkStructureType::SubmitInfo,
-			p_next: ptr::null(),
-			wait_semaphore_count: 0,
-			wait_semaphores: ptr::null(),
-			wait_dst_stage_mask:
-				&VkPipelineStage::ColorAttachmentOutput,
-			command_buffer_count: 1,
-			p_command_buffers: &command_buffer,
-			signal_semaphore_count: 0,
-			p_signal_semaphores: ptr::null(),
-		},
-		submit_fence
-	).unwrap();
-
-	(connection.wait_fence)(device, 1, &submit_fence, 1, u64::MAX).unwrap();
 	(connection.reset_fence)(device, 1, &submit_fence).unwrap();
 	(connection.reset_cmdbuff)(command_buffer, 0);
 
