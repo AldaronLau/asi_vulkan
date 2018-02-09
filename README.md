@@ -22,6 +22,7 @@ for interfacing safely with Vulkan in Rust.
 
 **asi_vulkan**'s planned support:
 * Raspberry Pi (no os)
+* Android
 
 # Contributing
 If you'd like to help implement functions for unsupported platforms, fix bugs,
