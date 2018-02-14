@@ -17,7 +17,7 @@
 
 [package]
 name = "asi_vulkan"
-version = "0.2.0"
+version = "0.2.1"
 authors = [
 	"Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>"
 ]
@@ -51,9 +51,6 @@ exclude = [
 
 [dependencies]
 ami = "^0.5"
-
-[build-dependencies.gcc]
-version = "0.3.50"
 
 [features]
 checks = []
