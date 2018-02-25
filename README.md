@@ -1,4 +1,4 @@
-# Aldaron's System Interface / Vulkan (asi_vulkan 0.2.1)
+# Aldaron's System Interface / Vulkan (asi_vulkan 0.3.0)
 
 Aldaron's System Interface / Vulkan is a library developed by Plop Grizzly
 for interfacing safely with Vulkan in Rust.
@@ -21,7 +21,7 @@ for interfacing safely with Vulkan in Rust.
 * Windows
 
 **asi_vulkan**'s planned support:
-* Raspberry Pi (no os)
+* Raspberry Pi ("no" os)
 * Android
 
 # Contributing
