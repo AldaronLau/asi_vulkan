@@ -4,8 +4,7 @@
 //
 // src/lib.rs
 
-#[macro_use]
-extern crate ami;
+extern crate libc;
 
 // Modules
 pub mod instance;
@@ -16,6 +15,13 @@ mod depth_buffer;
 mod image;
 mod surface;
 
+//
+use std::{ mem, u64 };
+use std::ffi::CString;
+use std::ptr::{ null, null_mut };
+use std::ptr;
+use libc::c_void;
+
 // Export Types
 pub use self::memory::Memory;
 pub use self::depth_buffer::DepthBuffer;
@@ -25,10 +31,6 @@ pub use self::surface::{ create_surface_windows, create_surface_xcb };
 //
 use self::types::*;
 
-use ami::{ Void };
-use std::{ mem, ptr, u64 };
-use std::ffi::CString;
-
 const VERSION: (u32, &'static str) = (4194304, "vulkan 1.0.0");
 
 const VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT: VkFlags = 0x00000002;
@@ -37,36 +39,30 @@ const VK_MEMORY_PROPERTY_HOST_COHERENT_BIT: VkFlags = 0x00000004;
 // Link to Kernel32
 #[cfg(target_os = "windows")]
 extern "system" {
-	fn LoadLibraryW(a: *const u16) -> *mut Void /*HMODULE*/;
-	fn GetProcAddress(b: *mut Void/*HMODULE*/, c: *const u8) -> *mut Void;
-	fn FreeLibrary(a: *mut Void/*HMODULE*/) -> i32 /*BOOL*/;
-}
-
-#[cfg(not(target_os = "windows"))]
-#[link = "dl"]
-extern "C" {
-	fn dlopen(filename: *const i8, flag: i32) -> *mut Void;
-	fn dlsym(handle: *mut Void, symbol: *const i8) -> *mut Void;
+	fn LoadLibraryW(a: *const u16) -> *mut c_void /*HMODULE*/;
+	fn GetProcAddress(b: *mut c_void/*HMODULE*/, c: *const u8)
+		-> *mut c_void;
+	fn FreeLibrary(a: *mut c_void/*HMODULE*/) -> i32 /*BOOL*/;
 }
 
 pub struct Connection {
 	pub vk: VkInstance,
-	pub lib: *mut Void,
-	vksym: unsafe extern "system" fn(VkInstance, *const i8) -> *mut Void,
-	vkdsym: unsafe extern "system" fn(VkDevice, *const i8) -> *mut Void,
+	pub lib: *mut c_void,
+	vksym: unsafe extern "system" fn(VkInstance, *const i8) -> *mut c_void,
+	vkdsym: unsafe extern "system" fn(VkDevice, *const i8) -> *mut c_void,
 	pub mapmem: unsafe extern "system" fn(VkDevice, VkDeviceMemory,
-		VkDeviceSize, VkDeviceSize, VkFlags, *mut *mut Void)
+		VkDeviceSize, VkDeviceSize, VkFlags, *mut *mut c_void)
 		-> VkResult,
 	draw: unsafe extern "system" fn(VkCommandBuffer, u32, u32, u32, i32,
 		u32) -> (),
 	unmap: unsafe extern "system" fn(VkDevice, VkDeviceMemory) -> (),
 	new_swapchain: unsafe extern "system" fn(VkDevice,
-		*const VkSwapchainCreateInfoKHR, *const Void,
+		*const VkSwapchainCreateInfoKHR, *const c_void,
 		*mut VkSwapchainKHR) -> VkResult,
 	get_swapcount: unsafe extern "system" fn(VkDevice, VkSwapchainKHR,
 		*mut u32, *mut VkImage) -> VkResult,
 	create_fence: unsafe extern "system" fn(VkDevice,
-		*const VkFenceCreateInfo, *const Void, *mut VkFence)
+		*const VkFenceCreateInfo, *const c_void, *mut VkFence)
 		-> VkResult,
 	begin_cmdbuff: unsafe extern "system" fn(VkCommandBuffer,
 		*const VkCommandBufferBeginInfo) -> VkResult,
@@ -83,68 +79,68 @@ pub struct Connection {
 		-> VkResult,
 	reset_cmdbuff: unsafe extern "system" fn(VkCommandBuffer, VkFlags),
 	create_imgview: unsafe extern "system" fn(VkDevice,
-		*const VkImageViewCreateInfo, *const Void, *mut VkImageView)
+		*const VkImageViewCreateInfo, *const c_void, *mut VkImageView)
 		-> VkResult,
 	get_memprops: unsafe extern "system" fn(VkPhysicalDevice,
 		*mut VkPhysicalDeviceMemoryProperties) -> (),
 	create_image: unsafe extern "system" fn(VkDevice,
-		*const VkImageCreateInfo, *const Void, *mut VkImage)
+		*const VkImageCreateInfo, *const c_void, *mut VkImage)
 		-> VkResult,
 	get_imgmemreq: unsafe extern "system" fn(VkDevice, VkImage,
 		*mut VkMemoryRequirements) -> (),
 	mem_allocate: unsafe extern "system" fn(VkDevice,
-		*const VkMemoryAllocateInfo, *const Void, *mut VkDeviceMemory)
+		*const VkMemoryAllocateInfo, *const c_void, *mut VkDeviceMemory)
 		-> VkResult,
 	bind_imgmem: unsafe extern "system" fn(VkDevice, VkImage,
 		VkDeviceMemory, VkDeviceSize) -> VkResult,
 	new_renderpass: unsafe extern "system" fn(VkDevice,
-		*const VkRenderPassCreateInfo, *const Void, *mut VkRenderPass)
+		*const VkRenderPassCreateInfo, *const c_void, *mut VkRenderPass)
 		-> VkResult,
 	create_framebuffer: unsafe extern "system" fn(VkDevice,
-		*const VkFramebufferCreateInfo, *const Void, *mut VkFramebuffer)
+		*const VkFramebufferCreateInfo, *const c_void, *mut VkFramebuffer)
 		-> VkResult,
 	drop_framebuffer: unsafe extern "system" fn(VkDevice, VkFramebuffer,
-		*const Void) -> (),
+		*const c_void) -> (),
 	drop_imgview: unsafe extern "system" fn(VkDevice, VkImageView,
-		*const Void) -> (),
+		*const c_void) -> (),
 	drop_renderpass: unsafe extern "system" fn(VkDevice, VkRenderPass,
-		*const Void) -> (),
-	drop_image: unsafe extern "system" fn(VkDevice, VkImage, *const Void)
+		*const c_void) -> (),
+	drop_image: unsafe extern "system" fn(VkDevice, VkImage, *const c_void)
 		-> (),
 	drop_swapchain: unsafe extern "system" fn(VkDevice, VkSwapchainKHR,
-		*const Void) -> (),
+		*const c_void) -> (),
 	update_descsets: unsafe extern "system" fn(VkDevice, u32,
-		*const VkWriteDescriptorSet, u32, *const Void) -> (),
+		*const VkWriteDescriptorSet, u32, *const c_void) -> (),
 	drop_descsets: unsafe extern "system" fn(VkDevice, VkDescriptorPool,
 		u32, *const VkDescriptorSet) -> VkResult,
 	drop_descpool: unsafe extern "system" fn(VkDevice, VkDescriptorPool,
-		*const Void) -> (),
+		*const c_void) -> (),
 	bind_buffer_mem: unsafe extern "system" fn(VkDevice, VkBuffer,
 		VkDeviceMemory, VkDeviceSize) -> VkResult,
 	get_bufmemreq: unsafe extern "system" fn(VkDevice, VkBuffer,
 		*mut VkMemoryRequirements) -> (),
 	new_buffer: unsafe extern "system" fn(VkDevice,
-		*const VkBufferCreateInfo, *const Void, *mut VkBuffer)
+		*const VkBufferCreateInfo, *const c_void, *mut VkBuffer)
 		-> VkResult,
 	new_descpool: unsafe extern "system" fn(VkDevice,
-		*const VkDescriptorPoolCreateInfo, *const Void,
+		*const VkDescriptorPoolCreateInfo, *const c_void,
 		*mut VkDescriptorPool) -> VkResult,
 	new_descsets: unsafe extern "system" fn(VkDevice,
 		*const VkDescriptorSetAllocateInfo, *mut VkDescriptorSet)
 		-> VkResult,
 	new_shademod: unsafe extern "system" fn(VkDevice,
-		*const VkShaderModuleCreateInfo, *const Void,
+		*const VkShaderModuleCreateInfo, *const c_void,
 		*mut VkShaderModule) -> VkResult,
 	drop_shademod: unsafe extern "system" fn(VkDevice, VkShaderModule,
-		*const Void) -> (),
+		*const c_void) -> (),
 	new_pipeline: unsafe extern "system" fn(VkDevice, VkPipelineCache, u32,
-		*const VkGraphicsPipelineCreateInfo, *const Void,
+		*const VkGraphicsPipelineCreateInfo, *const c_void,
 		*mut VkPipeline) -> VkResult,
 	new_pipeline_layout: unsafe extern "system" fn(VkDevice,
-		*const VkPipelineLayoutCreateInfo, *const Void,
+		*const VkPipelineLayoutCreateInfo, *const c_void,
 		*mut VkPipelineLayout) -> VkResult,
 	new_descset_layout: unsafe extern "system" fn(VkDevice,
-		*const VkDescriptorSetLayoutCreateInfo, *const Void,
+		*const VkDescriptorSetLayoutCreateInfo, *const c_void,
 		*mut VkDescriptorSetLayout) -> VkResult,
 	bind_vb: unsafe extern "system" fn(VkCommandBuffer, u32, u32,
 		*const VkBuffer, *const VkDeviceSize) -> (),
@@ -156,10 +152,10 @@ pub struct Connection {
 		VkPipelineBindPoint, VkPipelineLayout, u32, u32,
 		*const VkDescriptorSet, u32, *const u32) -> (),
 	new_semaphore: unsafe extern "system" fn(VkDevice,
-		*const VkSemaphoreCreateInfo, *const Void, *mut VkSemaphore)
+		*const VkSemaphoreCreateInfo, *const c_void, *mut VkSemaphore)
 		-> VkResult,
 	drop_semaphore: unsafe extern "system" fn(VkDevice, VkSemaphore,
-		*const Void) -> (),
+		*const c_void) -> (),
 	get_next_image: unsafe extern "system" fn(VkDevice, VkSwapchainKHR, u64,
 		VkSemaphore, VkFence, *mut u32) -> VkResult,
 	copy_image: unsafe extern "system" fn(VkCommandBuffer, VkImage,
@@ -170,7 +166,7 @@ pub struct Connection {
 	subres_layout: unsafe extern "system" fn(VkDevice, VkImage,
 		*const VkImageSubresource, *mut VkSubresourceLayout) -> (),
 	new_sampler: unsafe extern "system" fn(VkDevice,
-		*const VkSamplerCreateInfo, *const Void, *mut VkSampler)
+		*const VkSamplerCreateInfo, *const c_void, *mut VkSampler)
 		-> VkResult,
 	get_surface_capabilities: unsafe extern "system" fn(VkPhysicalDevice,
 		VkSurfaceKHR, *mut VkSurfaceCapabilitiesKHR) -> VkResult,
@@ -181,7 +177,7 @@ pub struct Connection {
 	set_scissor: unsafe extern "system" fn(VkCommandBuffer, u32, u32,
 		*const VkRect2D) -> (),
 	end_render_pass: unsafe extern "system" fn(VkCommandBuffer) -> (),
-	destroy_fence: unsafe extern "system" fn(VkDevice, VkFence, *const Void)
+	destroy_fence: unsafe extern "system" fn(VkDevice, VkFence, *const c_void)
 		-> (),
 	queue_present: unsafe extern "system" fn(VkQueue, *const VkPresentInfo) -> VkResult,
 	wait_idle: unsafe extern "system" fn(VkDevice) -> VkResult,
@@ -217,7 +213,7 @@ pub struct VwInstance {
 }
 
 #[cfg(target_os = "windows")]
-unsafe fn load_lib() -> *mut Void {
+unsafe fn load_lib() -> *mut c_void {
 //	let vulkan = if cfg!(target_pointer_width = "64") {
 //		"C:\\Windows\\SysWOW64\\vulkan-1.dll";
 //	} else {
@@ -235,10 +231,10 @@ unsafe fn load_lib() -> *mut Void {
 }
 
 #[cfg(not(target_os = "windows"))]
-unsafe fn load_lib() -> *mut Void {
+unsafe fn load_lib() -> *mut c_void {
 	let vulkan = b"libvulkan.so.1\0";
 
-	dlopen(&vulkan[0] as *const _ as *const i8, 1)
+	libc::dlopen(&vulkan[0] as *const _ as *const i8, 1)
 }
 
 pub unsafe fn load(app_name: &str) -> Connection {
@@ -322,22 +318,22 @@ pub unsafe fn load(app_name: &str) -> Connection {
 }
 
 #[cfg(target_os = "windows")]
-unsafe fn dl_sym<T>(lib: *mut Void, name: &[u8]) -> T {
+unsafe fn dl_sym<T>(lib: *mut c_void, name: &[u8]) -> T {
 	let fn_ptr = GetProcAddress(lib, &name[0]);
 
-	mem::transmute_copy::<*mut Void, T>(&fn_ptr)
+	mem::transmute_copy::<*mut c_void, T>(&fn_ptr)
 }
 
 #[cfg(not(target_os = "windows"))]
-unsafe fn dl_sym<T>(lib: *mut Void, name: &[u8]) -> T {
-	let fn_ptr = dlsym(lib, &name[0] as *const _ as *const i8);
+unsafe fn dl_sym<T>(lib: *mut c_void, name: &[u8]) -> T {
+	let fn_ptr = libc::dlsym(lib, &name[0] as *const _ as *const i8);
 
-	mem::transmute_copy::<*mut Void, T>(&fn_ptr)
+	mem::transmute_copy::<*mut c_void, T>(&fn_ptr)
 }
 
 #[inline(always)]
 unsafe fn vk_sym<T>(vk: VkInstance, vksym: unsafe extern "system" fn(
-	VkInstance, *const i8) -> *mut Void, name: &[u8]) -> T
+	VkInstance, *const i8) -> *mut c_void, name: &[u8]) -> T
 {
 	let fn_ptr = vksym(vk, &name[0] as *const _ as *const i8);
 
@@ -346,11 +342,11 @@ unsafe fn vk_sym<T>(vk: VkInstance, vksym: unsafe extern "system" fn(
 			.unwrap());
 	}
 
-	mem::transmute_copy::<*mut Void, T>(&fn_ptr)
+	mem::transmute_copy::<*mut c_void, T>(&fn_ptr)
 }
 
 unsafe fn vkd_sym<T>(device: VkDevice, vkdsym: unsafe extern "system" fn(
-	VkDevice, *const i8) -> *mut Void, name: &[u8]) -> T
+	VkDevice, *const i8) -> *mut c_void, name: &[u8]) -> T
 {
 	let fn_ptr = vkdsym(device, &name[0] as *const _ as *const i8);
 
@@ -359,7 +355,7 @@ unsafe fn vkd_sym<T>(device: VkDevice, vkdsym: unsafe extern "system" fn(
 			.unwrap());
 	}
 
-	mem::transmute_copy::<*mut Void, T>(&fn_ptr)
+	mem::transmute_copy::<*mut c_void, T>(&fn_ptr)
 }
 
 unsafe fn sym<T>(connection: &Connection, name: &[u8]) -> T {
@@ -371,7 +367,7 @@ unsafe fn dsym<T>(connection: &Connection, device: VkDevice, name: &[u8]) -> T {
 }
 
 unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
-	*const VkInstanceCreateInfo, *mut Void, *mut VkInstance) -> VkResult,
+	*const VkInstanceCreateInfo, *mut c_void, *mut VkInstance) -> VkResult,
 	name: &str) -> VkInstance
 {
 	let engine = concat!(
@@ -406,11 +402,11 @@ unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
 	vk_create_instance(
 		&VkInstanceCreateInfo {
 			s_type: VkStructureType::InstanceCreateInfo,
-			p_next: null_mut!(),
+			p_next: null_mut(),
 			flags: 0,
 			p_application_info: &VkApplicationInfo {
 				s_type: VkStructureType::ApplicationInfo,
-				p_next: null_mut!(),
+				p_next: null_mut(),
 				p_application_name: program_name.as_ptr(),
 				application_version: 2,
 				p_engine_name: engine_name.as_ptr(),
@@ -424,14 +420,14 @@ unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
 				if cfg!(feature = "checks") {
 					layernames.as_ptr()
 				} else {
-					ptr::null()
+					null()
 				}
 			},
 			enabled_extension_count: {
 				if cfg!(feature = "checks") { 3 } else { 2 }
 			},
 			pp_enabled_extension_names: extnames.as_ptr(),
-		}, null_mut!(), &mut instance
+		}, null_mut(), &mut instance
 	).unwrap();
 
 	println!("< adi_gpu: App: {}", name);
@@ -465,7 +461,7 @@ pub unsafe fn get_gpu(connection: &Connection, instance: VkInstance,
 	let mut num_gpus = 0;
 
 	// Run Function
-	vk_list_gpus(instance, &mut num_gpus, ptr::null_mut()).unwrap();
+	vk_list_gpus(instance, &mut num_gpus, null_mut()).unwrap();
 
 	// Set Data
 	let mut gpus = vec![mem::uninitialized(); num_gpus as usize];
@@ -488,7 +484,7 @@ pub unsafe fn get_gpu(connection: &Connection, instance: VkInstance,
 	for i in 0..(num_gpus as usize) {
 		let mut num_queue_families = 0;
 
-		vk_get_props(gpus[i], &mut num_queue_families, ptr::null_mut());
+		vk_get_props(gpus[i], &mut num_queue_families, null_mut());
 
 		let queue_families_size = num_queue_families as usize;
 
@@ -531,7 +527,7 @@ pub unsafe fn create_device(connection: &Connection, gpu: VkPhysicalDevice,
 	#[derive(Debug)] #[repr(C)]
 	struct VkDeviceQueueCreateInfo {
 		s_type: VkStructureType,
-		p_next: *mut Void,
+		p_next: *mut c_void,
 		flags: u32,
 		queue_family_index: u32,
 		queue_count: u32,
@@ -541,7 +537,7 @@ pub unsafe fn create_device(connection: &Connection, gpu: VkPhysicalDevice,
 	#[derive(Debug)] #[repr(C)]
 	struct VkDeviceCreateInfo {
 		s_type: VkStructureType,
-		p_next: *mut Void,
+		p_next: *mut c_void,
 		flags: u32,
 		queue_create_info_count: u32,
 		p_queue_create_infos: *const VkDeviceQueueCreateInfo,
@@ -549,14 +545,14 @@ pub unsafe fn create_device(connection: &Connection, gpu: VkPhysicalDevice,
 		enabled_layer_names: *const *const u8,
 		enabled_extension_count: u32,
 		enabled_extension_names: *const *const u8,
-		enabled_features: *mut Void,
+		enabled_features: *mut c_void,
 	}
 
 	// Load function
 	type VkCreateDevice = extern "system" fn(
 		physicalDevice: VkPhysicalDevice,
 		pCreateInfo: *const VkDeviceCreateInfo,
-		pAllocator: *mut Void,
+		pAllocator: *mut c_void,
 		pDevice: *mut VkDevice) -> VkResult;
 	let vk_create_device: VkCreateDevice = sym(connection,
 		b"vkCreateDevice\0");
@@ -566,23 +562,23 @@ pub unsafe fn create_device(connection: &Connection, gpu: VkPhysicalDevice,
 
 	vk_create_device(gpu, &VkDeviceCreateInfo {
 		s_type: VkStructureType::DeviceCreateInfo,
-		p_next: null_mut!(),
+		p_next: null_mut(),
 		flags: 0,
 		queue_create_info_count: 1,
 		p_queue_create_infos: [VkDeviceQueueCreateInfo {
 			s_type: VkStructureType::DeviceQueueCreateInfo,
-			p_next: null_mut!(),
+			p_next: null_mut(),
 			flags: 0,
 			queue_family_index: pqi,
 			queue_count: 1,
 			p_queue_priorities: &1.0,
 		}].as_ptr(),
 		enabled_layer_count: 0,
-		enabled_layer_names: null!(),
+		enabled_layer_names: null(),
 		enabled_extension_count: 1,
 		enabled_extension_names: [ext.as_ptr()].as_ptr(),
-		enabled_features: null_mut!(),
-	}, null_mut!(), &mut device).unwrap();
+		enabled_features: null_mut(),
+	}, null_mut(), &mut device).unwrap();
 
 	device
 }
@@ -612,13 +608,13 @@ pub unsafe fn queue_present(connection: &Connection, queue: VkQueue,
 {
 	let present_info = VkPresentInfo {
 		s_type: VkStructureType::PresentInfo,
-		next: ptr::null(),
+		next: null(),
 		wait_semaphore_count: 1,
 		wait_semaphores: &semaphore,
 		swapchain_count: 1,
 		swapchains: &swapchain,
 		image_indices: &next,
-		results: ptr::null_mut(),
+		results: null_mut(),
 	};
 
 	(connection.queue_present)(queue, &present_info).unwrap()
@@ -639,7 +635,7 @@ pub unsafe fn create_command_buffer(connection: &Connection, device: VkDevice,
 	#[repr(C)]
 	struct VkCommandPoolCreateInfo {
 		s_type: VkStructureType,
-		p_next: *mut Void,
+		p_next: *mut c_void,
 		flags: u32,
 		queue_family_index: u32,
 	}
@@ -647,7 +643,7 @@ pub unsafe fn create_command_buffer(connection: &Connection, device: VkDevice,
 	#[repr(C)]
 	struct VkCommandBufferAllocateInfo {
 		s_type: VkStructureType,
-		p_next: *mut Void,
+		p_next: *mut c_void,
 		command_pool: u64,
 		level: VkCommandBufferLevel,
 		command_buffer_count: u32,
@@ -656,7 +652,7 @@ pub unsafe fn create_command_buffer(connection: &Connection, device: VkDevice,
 	// Load function
 	type VkCreateCommandPool = extern "system" fn(device: VkDevice,
 		pCreateInfo: *const VkCommandPoolCreateInfo,
-		pAllocator: *mut Void, pCommandPool: *mut u64) -> VkResult;
+		pAllocator: *mut c_void, pCommandPool: *mut u64) -> VkResult;
 	let vk_create_command_pool: VkCreateCommandPool = dsym(connection,
 		device, b"vkCreateCommandPool\0");
 
@@ -666,13 +662,13 @@ pub unsafe fn create_command_buffer(connection: &Connection, device: VkDevice,
 
 	let create_info = VkCommandPoolCreateInfo {
 		s_type: VkStructureType::CommandPoolCreateInfo,
-		p_next: null_mut!(),
+		p_next: null_mut(),
 		flags: 0x00000002, // Reset Command Buffer
 		queue_family_index: pqi,
 	};
 
 	// Run Function
-	vk_create_command_pool(device, &create_info, null_mut!(),
+	vk_create_command_pool(device, &create_info, null_mut(),
 		&mut command_pool).unwrap();
 
 	// Load Function
@@ -685,7 +681,7 @@ pub unsafe fn create_command_buffer(connection: &Connection, device: VkDevice,
 	// Set Data
 	let allocate_info = VkCommandBufferAllocateInfo {
 		s_type: VkStructureType::CommandBufferAllocateInfo,
-		p_next: null_mut!(),
+		p_next: null_mut(),
 		command_pool: command_pool,
 		level: VkCommandBufferLevel::Primary,
 		command_buffer_count: 1,
@@ -708,7 +704,7 @@ pub unsafe fn new_sampler(connection: &Connection, device: VkDevice)
 		device,
 		&VkSamplerCreateInfo {
 			s_type: VkStructureType::SamplerCreateInfo,
-			next: ptr::null(),
+			next: null(),
 			flags: 0,
 			mag_filter: VkFilter::Linear,
 			min_filter: VkFilter::Nearest,
@@ -726,7 +722,7 @@ pub unsafe fn new_sampler(connection: &Connection, device: VkDevice)
 			border_color: VkBorderColor::FloatOpaqueWhite,
 			unnormalized_coordinates: 0,
 		},
-		ptr::null(),
+		null(),
 		&mut sampler
 	).unwrap();
 
@@ -759,7 +755,7 @@ pub unsafe fn map_memory<T>(connection: &Connection, device: VkDevice,
 	let mut mapped = mem::uninitialized();
 
 	(connection.mapmem)(device, vb_memory, 0, size, 0,
-		&mut mapped as *mut *mut _ as *mut *mut Void).unwrap();
+		&mut mapped as *mut *mut _ as *mut *mut c_void).unwrap();
 
 	mapped
 }
@@ -806,7 +802,7 @@ pub unsafe fn cmd_bind_descsets(connection: &Connection,
 		1,
 		[desc_set].as_ptr(),
 		0,
-		ptr::null(),
+		null(),
 	);
 }
 
@@ -867,10 +863,10 @@ pub unsafe fn new_semaphore(connection: &Connection, device: VkDevice)
 		device,
 		&VkSemaphoreCreateInfo {
 			s_type: VkStructureType::SemaphoreCreateInfo,
-			next: ptr::null(),
+			next: null(),
 			flags: 0,
 		},
-		ptr::null(),
+		null(),
 		&mut semaphore,
 	).unwrap();
 
@@ -883,7 +879,7 @@ pub unsafe fn drop_semaphore(connection: &Connection, device: VkDevice,
 	(connection.drop_semaphore)(
 		device,
 		semaphore,
-		ptr::null(),
+		null(),
 	);
 }
 
@@ -894,16 +890,16 @@ pub unsafe fn draw_begin(connection: &Connection,
 {
 	let begin_info = VkCommandBufferBeginInfo {
 		s_type: VkStructureType::CommandBufferBeginInfo,
-		p_next: ptr::null(),
+		p_next: null(),
 		flags: VkCommandBufferUsage::OneTimeSubmitBit,
-		p_inheritance_info: ptr::null(),
+		p_inheritance_info: null(),
 	};
 
 	(connection.begin_cmdbuff)(command_buffer, &begin_info).unwrap();
 
 	let layout_transition_barrier = VkImageMemoryBarrier {
 		s_type: VkStructureType::ImageMemoryBarrier,
-		p_next: ptr::null(),
+		p_next: null(),
 		src_access_mask: VkAccess::MemoryReadBit,
 		dst_access_mask: VkAccess::ColorAttachmentReadWrite,
 		old_layout: VkImageLayout::PresentSrc,
@@ -924,7 +920,7 @@ pub unsafe fn draw_begin(connection: &Connection,
 		command_buffer,
 		VkPipelineStage::TopOfPipe, 
 		VkPipelineStage::TopOfPipeAndColorAttachmentOutput, 
-		0, 0, ptr::null(), 0, ptr::null(), 1, &layout_transition_barrier);
+		0, 0, null(), 0, null(), 1, &layout_transition_barrier);
 
 	// activate render pass:
 	let clear_value = [
@@ -934,7 +930,7 @@ pub unsafe fn draw_begin(connection: &Connection,
 
 	let render_pass_begin_info = VkRenderPassBeginInfo {
 		s_type: VkStructureType::RenderPassBeginInfo,
-		p_next: ptr::null(),
+		p_next: null(),
 		render_pass: render_pass,
 		framebuffer: frame_buffer,
 		render_area: VkRect2D {
@@ -977,7 +973,7 @@ pub unsafe fn pipeline_barrier(connection: &Connection,
 {
 	let barrier = VkImageMemoryBarrier {
 		s_type: VkStructureType::ImageMemoryBarrier,
-		p_next: ptr::null(),
+		p_next: null(),
 		src_access_mask: VkAccess::ColorAttachmentWriteBit,
 		dst_access_mask: VkAccess::MemoryReadBit,
 		old_layout: VkImageLayout::ColorAttachmentOptimal,
@@ -998,7 +994,7 @@ pub unsafe fn pipeline_barrier(connection: &Connection,
 		command_buffer,
 		VkPipelineStage::AllCommands, 
 		VkPipelineStage::BottomOfPipe, 
-		0, 0, ptr::null(), 0, ptr::null(), 1, &barrier);
+		0, 0, null(), 0, null(), 1, &barrier);
 }
 
 pub unsafe fn get_next_image(connection: &Connection, device: VkDevice,
@@ -1017,6 +1013,8 @@ pub unsafe fn get_next_image(connection: &Connection, device: VkDevice,
 	);
 
 	while result == VkResult::OutOfDateKhr {
+		println!("OUt OF DAte");
+
 		drop_semaphore(connection, device, *presenting_complete_sem);
 		*presenting_complete_sem = new_semaphore(connection, device);
 
@@ -1114,7 +1112,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	let mut npresentmodes = mem::uninitialized();
 
 	// Run Function
-	vk_get_present_modes(gpu, surface, &mut npresentmodes, ptr::null_mut())
+	vk_get_present_modes(gpu, surface, &mut npresentmodes, null_mut())
 		.unwrap();
 
 	// Set Data
@@ -1177,7 +1175,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 		device,
 		&VkSwapchainCreateInfoKHR {
 			s_type: VkStructureType::SwapchainCreateInfo,
-			p_next: ptr::null(),
+			p_next: null(),
 			flags: 0,
 			surface: surface,
 			min_image_count: *image_count,
@@ -1193,14 +1191,14 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 			clipped: 0,
 			old_swapchain: mem::zeroed(), // vulkan->swapchain,
 			queue_family_index_count: 0,
-			p_queue_family_indices: ptr::null(),
+			p_queue_family_indices: null(),
 		},
-		ptr::null(),
+		null(),
 		swapchain
 	).unwrap();
 
 	(connection.get_swapcount)(device, *swapchain, image_count,
-		ptr::null_mut()).unwrap();
+		null_mut()).unwrap();
 	(connection.get_swapcount)(device, *swapchain, image_count,
 		swap_images).unwrap();
 }
@@ -1237,7 +1235,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 		device,
 		&VkImageViewCreateInfo {
 			s_type: VkStructureType::ImageViewCreateInfo,
-			p_next: ptr::null(),
+			p_next: null(),
 			flags: 0,
 			view_type: VkImageViewType::SingleLayer2d,
 			format: format.clone(),
@@ -1251,7 +1249,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 			},
 			image,
 		},
-		ptr::null(),
+		null(),
 		&mut image_view
 	).unwrap();
 
@@ -1273,10 +1271,10 @@ pub unsafe fn create_fence(connection: &Connection, device: VkDevice)
 		device,
 		&VkFenceCreateInfo {
 			s_type: VkStructureType::FenceCreateInfo,
-			p_next: ptr::null(),
+			p_next: null(),
 			flags: 0,
 		},
-		ptr::null(),
+		null(),
 		&mut fence
 	).unwrap();
 
@@ -1287,27 +1285,33 @@ pub unsafe fn fence_drop(connection: &Connection, device: VkDevice,
 	fence: VkFence)
 {
 	(connection.destroy_fence)(
-		device, fence, ptr::null()
+		device, fence, null()
 	);
 }
 
 pub unsafe fn queue_submit(connection: &Connection,
 	command_buffer: VkCommandBuffer, submit_fence: VkFence,
-	pipelane_stage: VkPipelineStage, queue: VkQueue)
+	pipelane_stage: VkPipelineStage, queue: VkQueue,
+	semaphore: Option<VkSemaphore>)
 {
 	(connection.queue_submit)(
 		queue,
 		1,
 		&VkSubmitInfo {
 			s_type: VkStructureType::SubmitInfo,
-			p_next: ptr::null(),
+			p_next: null(),
 			wait_semaphore_count: 0,
-			wait_semaphores: ptr::null(),
+			wait_semaphores: null(),
 			wait_dst_stage_mask: &pipelane_stage,
 			command_buffer_count: 1,
 			p_command_buffers: &command_buffer,
-			signal_semaphore_count: 0,
-			p_signal_semaphores: ptr::null(),
+			signal_semaphore_count: if semaphore.is_none() { 0 }
+				else { 1 },
+			p_signal_semaphores: if let Some(ref sem) = semaphore {
+				sem
+			} else {
+				null()
+			},
 		},
 		submit_fence
 	).unwrap();
@@ -1332,9 +1336,9 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 			command_buffer,
 			&VkCommandBufferBeginInfo {
 				s_type: VkStructureType::CommandBufferBeginInfo,
-				p_next: ptr::null(),
+				p_next: null(),
 				flags: VkCommandBufferUsage::OneTimeSubmitBit,
-				p_inheritance_info: ptr::null(),
+				p_inheritance_info: null(),
 			}
 		).unwrap();
 
@@ -1342,10 +1346,10 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 			command_buffer,
 			VkPipelineStage::TopOfPipe, 
 			VkPipelineStage::TopOfPipe,
-			0, 0, ptr::null(), 0, ptr::null(), 1,
+			0, 0, null(), 0, null(), 1,
 			&VkImageMemoryBarrier {
 				s_type: VkStructureType::ImageMemoryBarrier,
-				p_next: ptr::null(),
+				p_next: null(),
 				src_access_mask: VkAccess::NoFlags,
 				dst_access_mask: VkAccess::MemoryReadBit,
 				old_layout: VkImageLayout::Undefined,
@@ -1365,7 +1369,8 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 
 		end_cmdbuff(connection, command_buffer);
 		queue_submit(connection, command_buffer, *submit_fence,
-			VkPipelineStage::ColorAttachmentOutput, present_queue);
+			VkPipelineStage::ColorAttachmentOutput, present_queue,
+			None);
 		wait_fence(connection, device, *submit_fence);
 
 		(connection.reset_fence)(device, 1, submit_fence).unwrap();
@@ -1393,9 +1398,9 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 		command_buffer,
 		&VkCommandBufferBeginInfo {
 			s_type: VkStructureType::CommandBufferBeginInfo,
-			p_next: ptr::null(),
+			p_next: null(),
 			flags: VkCommandBufferUsage::OneTimeSubmitBit,
-			p_inheritance_info: ptr::null(),
+			p_inheritance_info: null(),
 		}
 	).unwrap();
 
@@ -1405,13 +1410,13 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 		VkPipelineStage::TopOfPipeAndEarlyFragmentTests,
 		0,
 		0,
-		ptr::null(),
+		null(),
 		0,
-		ptr::null(),
+		null(),
 		1,
 		&VkImageMemoryBarrier {
 			s_type: VkStructureType::ImageMemoryBarrier,
-			p_next: ptr::null(),
+			p_next: null(),
 			src_access_mask: VkAccess::NoFlags,
 			dst_access_mask:
 				VkAccess::DepthStencilAttachmentReadWrite,
@@ -1433,7 +1438,7 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 
 	end_cmdbuff(connection, command_buffer);
 	queue_submit(connection, command_buffer, submit_fence,
-			VkPipelineStage::ColorAttachmentOutput, present_queue);
+		VkPipelineStage::ColorAttachmentOutput, present_queue, None);
 	wait_fence(connection, device, submit_fence);
 
 	(connection.reset_fence)(device, 1, &submit_fence).unwrap();
@@ -1456,7 +1461,7 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 		device,
 		&VkRenderPassCreateInfo {
 			s_type: VkStructureType::RenderPassCreateInfo,
-			p_next: ptr::null(),
+			p_next: null(),
 			flags: 0,
 			attachment_count: 2,
 			attachments: [
@@ -1510,15 +1515,15 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 					 VkImageLayout::DepthStencilAttachmentOptimal,
 				},
 				input_attachment_count: 0,
-				input_attachments: ptr::null(),
+				input_attachments: null(),
 				preserve_attachment_count: 0,
-				preserve_attachments: ptr::null(),
-				resolve_attachments: ptr::null(),
+				preserve_attachments: null(),
+				resolve_attachments: null(),
 			},
 			dependency_count: 0,
-			dependencies: ptr::null(),
+			dependencies: null(),
 		},
-		ptr::null(),
+		null(),
 		&mut render_pass
 	).unwrap();
 
@@ -1537,7 +1542,7 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 			device,
 			&VkFramebufferCreateInfo {
 				s_type: VkStructureType::FramebufferCreateInfo,
-				p_next: ptr::null(),
+				p_next: null(),
 				flags: 0,
 				attachment_count: 2,
 				attachments: [
@@ -1547,7 +1552,7 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 				layers: 1,
 				render_pass, width, height,
 			},
-			ptr::null(),
+			null(),
 			&mut fbs[i]
 		).unwrap();
 	}
@@ -1563,21 +1568,21 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 	// Free framebuffers & image view #1
 	for i in 0..(image_count as usize) {
 		(connection.drop_framebuffer)(device, frame_buffers[i],
-			ptr::null());
+			null());
 		(connection.drop_imgview)(device, present_imgviews[i],
-			ptr::null());
-//		(connection.drop_image)(device, present_images[i], ptr::null());
+			null());
+//		(connection.drop_image)(device, present_images[i], null());
 	}
 	// Free render pass
-	(connection.drop_renderpass)(device, render_pass, ptr::null());
+	(connection.drop_renderpass)(device, render_pass, null());
 	// Free depth buffer
-	(connection.drop_imgview)(device, depth_imgview, ptr::null());
-	(connection.drop_image)(device, depth_image, ptr::null());
-//	(connection.drop_memory)(device, depth_image_memory, ptr::null());
+	(connection.drop_imgview)(device, depth_imgview, null());
+	(connection.drop_image)(device, depth_image, null());
+//	(connection.drop_memory)(device, depth_image_memory, null());
 	// Free image view #2
 //	vkDestroyFence(vulkan->device, vulkan->submit_fence, NULL);  // TODO: Mem Error
 	// Free swapchain
-	(connection.drop_swapchain)(device, swapchain, ptr::null());
+	(connection.drop_swapchain)(device, swapchain, null());
 }
 
 enum Set {
@@ -1657,15 +1662,15 @@ impl DescriptorSetWriter {
 					};
 					writes[i as usize] = VkWriteDescriptorSet {
 						s_type: VkStructureType::WriteDescriptorSet,
-						next: ptr::null(),
+						next: null(),
 						dst_set: desc_set,
 						dst_binding: i as u32,
 						descriptor_count: 1, //tex_count,
 						descriptor_type: VkDescriptorType::CombinedImageSampler,
 						image_info: &image_infos[i as usize],
-						buffer_info: ptr::null(),
+						buffer_info: null(),
 						dst_array_element: 0,
-						texel_buffer_view: ptr::null(),
+						texel_buffer_view: null(),
 					};
 				}
 				Set::Uniform(desc_set, buffer) => {				
@@ -1676,15 +1681,15 @@ impl DescriptorSetWriter {
 					};
 					writes[i as usize] = VkWriteDescriptorSet {
 						s_type: VkStructureType::WriteDescriptorSet,
-						next: ptr::null(),
+						next: null(),
 						dst_set: desc_set,
 						dst_binding: i as u32,
 						descriptor_count: 1,
 						descriptor_type: VkDescriptorType::UniformBuffer,
 						buffer_info: &buffer_infos[i as usize],
 						dst_array_element: 0,
-						texel_buffer_view: ptr::null(),
-						image_info: ptr::null(),
+						texel_buffer_view: null(),
+						image_info: null(),
 					};
 				}
 			}
@@ -1696,7 +1701,7 @@ impl DescriptorSetWriter {
 				self.nwrites as u32,
 				writes.as_ptr(),
 				0,
-				ptr::null(),
+				null(),
 			);
 		}
 	}
@@ -1760,7 +1765,7 @@ pub unsafe fn vw_instance_new<T>(connection: &Connection,
 		// TODO: based on new_pipeline()
 		&VkDescriptorPoolCreateInfo {
 			s_type: VkStructureType::DescriptorPoolCreateInfo,
-			next: ptr::null(),
+			next: null(),
 			flags: 0,
 			max_sets: 1,
 			pool_size_count: if tex_count { 4 } else { 3 },
@@ -1794,7 +1799,7 @@ pub unsafe fn vw_instance_new<T>(connection: &Connection,
 				}].as_ptr()
 			},
 		},
-		ptr::null(),
+		null(),
 		&mut desc_pool
 	).unwrap();
 
@@ -1802,7 +1807,7 @@ pub unsafe fn vw_instance_new<T>(connection: &Connection,
 		device,
 		&VkDescriptorSetAllocateInfo {
 			s_type: VkStructureType::DescriptorSetAllocateInfo,
-			next: ptr::null(),
+			next: null(),
 			descriptor_pool: desc_pool,
 			descriptor_set_count: 1,
 			set_layouts: &pipeline.descsetlayout
@@ -1846,15 +1851,15 @@ pub unsafe fn new_shape(connection: &Connection, device: VkDevice,
 		device,
 		&VkBufferCreateInfo {
 			s_type: VkStructureType::BufferCreateInfo,
-			next: ptr::null(),
+			next: null(),
 			flags: 0,
 			size: size, // size in Bytes
 			usage: VkBufferUsage::VertexIndexBufferBit,
 			sharing_mode: VkSharingMode::Exclusive,
 			queue_family_index_count: 0,
-			queue_family_indices: ptr::null(),
+			queue_family_indices: null(),
 		},
-		ptr::null(),
+		null(),
 		&mut vertex_input_buffer
 	).unwrap();
 
@@ -1869,7 +1874,7 @@ pub unsafe fn new_shape(connection: &Connection, device: VkDevice,
 		device,
 		&VkMemoryAllocateInfo {
 			s_type: VkStructureType::MemoryAllocateInfo,
-			next: ptr::null(),
+			next: null(),
 			allocation_size: vb_memreqs.size,
 			memory_type_index: get_memory_type(
 				connection,
@@ -1877,7 +1882,7 @@ pub unsafe fn new_shape(connection: &Connection, device: VkDevice,
 				vb_memreqs.memory_type_bits,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ),
 		},
-		ptr::null(),
+		null(),
 		&mut vertex_buffer_memory,
 	).unwrap();
 
@@ -1926,15 +1931,15 @@ pub unsafe fn new_buffer(connection: &Connection, device: VkDevice,
 		device,
 		&VkBufferCreateInfo {
 			s_type: VkStructureType::BufferCreateInfo,
-			next: ptr::null(),
+			next: null(),
 			flags: 0,
 			size: size, // size in Bytes
 			usage: VkBufferUsage::VertexBufferBit,
 			sharing_mode: VkSharingMode::Exclusive,
 			queue_family_index_count: 0,
-			queue_family_indices: ptr::null(),
+			queue_family_indices: null(),
 		},
-		ptr::null(),
+		null(),
 		&mut vertex_input_buffer
 	).unwrap();
 
@@ -1949,7 +1954,7 @@ pub unsafe fn new_buffer(connection: &Connection, device: VkDevice,
 		device,
 		&VkMemoryAllocateInfo {
 			s_type: VkStructureType::MemoryAllocateInfo,
-			next: ptr::null(),
+			next: null(),
 			allocation_size: vb_memreqs.size,
 			memory_type_index: get_memory_type(
 				connection,
@@ -1957,7 +1962,7 @@ pub unsafe fn new_buffer(connection: &Connection, device: VkDevice,
 				vb_memreqs.memory_type_bits,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ),
 		},
-		ptr::null(),
+		null(),
 		&mut vertex_buffer_memory,
 	).unwrap();
 
@@ -1971,7 +1976,7 @@ pub unsafe fn new_buffer(connection: &Connection, device: VkDevice,
 		0,
 		size,
 		0,
-		&mut mapped as *mut *mut _ as *mut *mut Void
+		&mut mapped as *mut *mut _ as *mut *mut c_void
 	).unwrap();
 
 	ptr::copy_nonoverlapping(vertices.as_ptr(), mapped, vertices.len());
@@ -1992,7 +1997,7 @@ pub unsafe fn new_buffer(connection: &Connection, device: VkDevice,
 pub struct ShaderModule(
 	VkShaderModule,
 	VkDevice,
-	unsafe extern "system" fn(VkDevice, VkShaderModule, *const Void) -> (),
+	unsafe extern "system" fn(VkDevice, VkShaderModule, *const c_void) -> (),
 );
 
 // TODO: Move to asi_vulkan
@@ -2008,12 +2013,12 @@ impl ShaderModule {
 				device,
 				&VkShaderModuleCreateInfo {
 					s_type: VkStructureType::ShaderModuleCreateInfo,
-					next: ptr::null(),
+					next: null(),
 					flags: 0,
 					code_size: spirv_shader.len(),
 					code: spirv_shader.as_ptr(),
 				},
-				ptr::null(),
+				null(),
 				&mut shader
 			).unwrap();
 		}
@@ -2026,7 +2031,7 @@ impl ShaderModule {
 impl Drop for ShaderModule {
 	fn drop(&mut self) -> () {
 		unsafe {
-			(self.2)(self.1, self.0, ptr::null());
+			(self.2)(self.1, self.0, null());
 		}
 	}
 }
@@ -2055,7 +2060,7 @@ pub fn new_pipeline(connection: &Connection,
 		device,
 		&VkDescriptorSetLayoutCreateInfo {
 			s_type: VkStructureType::DescriptorSetLayoutCreateInfo,
-			next: ptr::null(),
+			next: null(),
 			flags: 0,
 			binding_count: 3 + ntextures,
 			// TODO: consolidate
@@ -2065,21 +2070,21 @@ pub fn new_pipeline(connection: &Connection,
 					descriptor_type: VkDescriptorType::UniformBuffer,
 					descriptor_count: 1,
 					stage_flags: VkShaderStage::VertexAndFragment,
-					immutable_samplers: ptr::null(),
+					immutable_samplers: null(),
 				},
 				VkDescriptorSetLayoutBinding {
 					binding: 1,
 					descriptor_type: VkDescriptorType::UniformBuffer,
 					descriptor_count: 1,
 					stage_flags: VkShaderStage::Vertex,
-					immutable_samplers: ptr::null(),
+					immutable_samplers: null(),
 				},
 				VkDescriptorSetLayoutBinding {
 					binding: 2,
 					descriptor_type: VkDescriptorType::UniformBuffer,
 					descriptor_count: 1,
 					stage_flags: VkShaderStage::Fragment,
-					immutable_samplers: ptr::null(),
+					immutable_samplers: null(),
 				}].as_ptr()
 			} else {
 				[VkDescriptorSetLayoutBinding {
@@ -2087,32 +2092,32 @@ pub fn new_pipeline(connection: &Connection,
 					descriptor_type: VkDescriptorType::UniformBuffer,
 					descriptor_count: 1,
 					stage_flags: VkShaderStage::VertexAndFragment,
-					immutable_samplers: ptr::null(),
+					immutable_samplers: null(),
 				},
 				VkDescriptorSetLayoutBinding {
 					binding: 1,
 					descriptor_type: VkDescriptorType::UniformBuffer,
 					descriptor_count: 1,
 					stage_flags: VkShaderStage::Vertex,
-					immutable_samplers: ptr::null(),
+					immutable_samplers: null(),
 				},
 				VkDescriptorSetLayoutBinding {
 					binding: 2,
 					descriptor_type: VkDescriptorType::UniformBuffer,
 					descriptor_count: 1,
 					stage_flags: VkShaderStage::Fragment,
-					immutable_samplers: ptr::null(),
+					immutable_samplers: null(),
 				},
 				VkDescriptorSetLayoutBinding {
 					binding: 3,
 					descriptor_type: VkDescriptorType::CombinedImageSampler,
 					descriptor_count: 1, // Texture Count
 					stage_flags: VkShaderStage::Fragment,
-					immutable_samplers: ptr::null(),
+					immutable_samplers: null(),
 				}].as_ptr()
 			},
 		},
-		ptr::null(),
+		null(),
 		&mut descsetlayout
 	).unwrap();
 
@@ -2121,14 +2126,14 @@ pub fn new_pipeline(connection: &Connection,
 		device,
 		&VkPipelineLayoutCreateInfo {
 			s_type: VkStructureType::PipelineLayoutCreateInfo,
-			next: ptr::null(),
+			next: null(),
 			flags: 0,
 			set_layout_count: 1,
 			set_layouts: [descsetlayout].as_ptr(),
 			push_constant_range_count: 0,
-			push_constant_ranges: ptr::null(),
+			push_constant_ranges: null(),
 		},
-		ptr::null(),
+		null(),
 		&mut pipeline_layout
 	).unwrap();
 
@@ -2139,32 +2144,32 @@ pub fn new_pipeline(connection: &Connection,
 		1,
 		&VkGraphicsPipelineCreateInfo {
 			s_type: VkStructureType::GraphicsPipelineCreateInfo,
-			next: ptr::null(),
+			next: null(),
 			flags: 0,
 			stage_count: 2,
 			stages: [
 				VkPipelineShaderStageCreateInfo {
 					s_type: VkStructureType::PipelineShaderStageCreateInfo,
-					next: ptr::null(),
+					next: null(),
 					flags: 0,
 					stage: VkShaderStage::Vertex,
 					module: vertex.0,
 					name: b"main\0".as_ptr(), // shader main function name
-					specialization_info: ptr::null(),
+					specialization_info: null(),
 				},
 				VkPipelineShaderStageCreateInfo {
 					s_type: VkStructureType::PipelineShaderStageCreateInfo,
-					next: ptr::null(),
+					next: null(),
 					flags: 0,
 					stage: VkShaderStage::Fragment,
 					module: fragment.0,
 					name: b"main\0".as_ptr(), // shader main function name
-					specialization_info: ptr::null(),
+					specialization_info: null(),
 				},
 			].as_ptr(),
 			vertex_input_state: &VkPipelineVertexInputStateCreateInfo {
 				s_type: VkStructureType::PipelineVertexInputStateCreateInfo,
-				next: ptr::null(),
+				next: null(),
 				flags: 0,
 				vertex_binding_description_count: nvbuffers,
 				vertex_binding_descriptions: [
@@ -2211,15 +2216,15 @@ pub fn new_pipeline(connection: &Connection,
 			},
 			input_assembly_state: &VkPipelineInputAssemblyStateCreateInfo {
 				s_type: VkStructureType::PipelineInputAssemblyStateCreateInfo,
-				next: ptr::null(),
+				next: null(),
 				flags: 0,
 				topology: VkPrimitiveTopology::TriangleList,
 				primitive_restart_enable: 0,
 			},
-			tessellation_state: ptr::null(),
+			tessellation_state: null(),
 			viewport_state: &VkPipelineViewportStateCreateInfo {
 				s_type: VkStructureType::PipelineViewportStateCreateInfo,
-				next: ptr::null(),
+				next: null(),
 				flags: 0,
 				viewport_count: 1,
 				viewports: &VkViewport {
@@ -2237,7 +2242,7 @@ pub fn new_pipeline(connection: &Connection,
 			},
 			rasterization_state: &VkPipelineRasterizationStateCreateInfo {
 				s_type: VkStructureType::PipelineRasterizationStateCreateInfo,
-				next: ptr::null(),
+				next: null(),
 				flags: 0,
 				depth_clamp_enable: 0,
 				rasterizer_discard_enable: 0,
@@ -2252,18 +2257,18 @@ pub fn new_pipeline(connection: &Connection,
 			},
 			multisample_state: &VkPipelineMultisampleStateCreateInfo {
 				s_type: VkStructureType::PipelineMultisampleStateCreateInfo,
-				next: ptr::null(),
+				next: null(),
 				flags: 0,
 				rasterization_samples: VkSampleCount::Sc1,
 				sample_shading_enable: 0,
 				min_sample_shading: 0.0,
-				sample_mask: ptr::null(),
+				sample_mask: null(),
 				alpha_to_coverage_enable: 0,
 				alpha_to_one_enable: 0,
 			},
 			depth_stencil_state: &VkPipelineDepthStencilStateCreateInfo {
 				s_type: VkStructureType::PipelineDepthStencilStateCreateInfo,
-				next: ptr::null(),
+				next: null(),
 				flags: 0,
 				depth_test_enable: 1,
 				depth_write_enable: 1,
@@ -2277,7 +2282,7 @@ pub fn new_pipeline(connection: &Connection,
 			},
 			color_blend_state: &VkPipelineColorBlendStateCreateInfo {
 				s_type: VkStructureType::PipelineColorBlendStateCreateInfo,
-				next: ptr::null(),
+				next: null(),
 				flags: 0,
 				logic_op_enable: 0,
 				logic_op: VkLogicOp::Clear,
@@ -2298,7 +2303,7 @@ pub fn new_pipeline(connection: &Connection,
 			},
 			dynamic_state: &VkPipelineDynamicStateCreateInfo {
 				s_type: VkStructureType::PipelineDynamicStateCreateInfo,
-				next: ptr::null(),
+				next: null(),
 				flags: 0,
 				dynamic_state_count: 2,
 				dynamic_states: [
@@ -2311,7 +2316,7 @@ pub fn new_pipeline(connection: &Connection,
 			base_pipeline_handle: mem::zeroed(), // NULL TODO: ?
 			base_pipeline_index: 0,
 		},
-		ptr::null(),
+		null(),
 		&mut pipeline
 	).unwrap();
 
@@ -2327,22 +2332,22 @@ pub unsafe fn destroy_uniforms(connection: &Connection,
 	desc_set: VkDescriptorSet, desc_pool: VkDescriptorPool,
 	_/*uniform_buffer*/: VkBuffer) -> ()
 {
-//	(connection.drop_memory)(device, uniform_memory, ptr::null());
+//	(connection.drop_memory)(device, uniform_memory, null());
 	(connection.drop_descsets)(device, desc_pool, 1, &desc_set).unwrap();
-	(connection.drop_descpool)(device, desc_pool, ptr::null());
-//	(connection.drop_buffer)(device, uniform_buffer, ptr::null());
+	(connection.drop_descpool)(device, desc_pool, null());
+//	(connection.drop_buffer)(device, uniform_buffer, null());
 }
 
 pub unsafe fn destroy_instance(connection: &Connection) -> () {
 	// Load Function
 	type VkDestroyInstance = unsafe extern "system" fn(instance: VkInstance,
-		pAllocator: *mut Void) -> ();
+		pAllocator: *mut c_void) -> ();
 	let function_name = b"vkDestroyInstance\0";
 	let destroy: VkDestroyInstance =
 		sym(connection, function_name);
 
 	// Run Function
-	destroy(connection.vk, null_mut!());
+	destroy(connection.vk, null_mut());
 }
 
 pub unsafe fn destroy_surface(connection: &Connection, surface: VkSurfaceKHR)
@@ -2350,10 +2355,10 @@ pub unsafe fn destroy_surface(connection: &Connection, surface: VkSurfaceKHR)
 {
 	// Load Function
 	type VkDestroySurface = unsafe extern "system" fn(instance: VkInstance,
-		surface: VkSurfaceKHR, pAllocator: *mut Void) -> ();
+		surface: VkSurfaceKHR, pAllocator: *mut c_void) -> ();
 	let destroy: VkDestroySurface = sym(connection,
 		b"vkDestroySurfaceKHR\0");
 
 	// Run Function
-	destroy(connection.vk, surface, null_mut!());
+	destroy(connection.vk, surface, null_mut());
 }

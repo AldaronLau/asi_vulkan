@@ -5,7 +5,7 @@
 // src/renderer/ffi/vulkan/ffi/types.rs
 
 use std::fmt;
-use ami::Void;
+use libc::c_void;
 
 pub type VkDeviceSize = u64;
 pub type VkFlags = u32;
@@ -20,7 +20,7 @@ pub type VkSampleMask = u32;
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkRenderPass(u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkFramebuffer(u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkFence(u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSemaphore(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSemaphore(pub u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkImageView(u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkBuffer(pub u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkShaderModule(u64);
@@ -33,15 +33,15 @@ pub type VkSampleMask = u32;
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipelineCache(u64);
 
 // Dispatchable Handles
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDevice(*mut Void);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPhysicalDevice(*mut Void);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkInstance(*mut Void);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkCommandBuffer(*mut Void);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkQueue(*mut Void);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDevice(*mut c_void);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPhysicalDevice(*mut c_void);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkInstance(*mut c_void);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkCommandBuffer(*mut c_void);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkQueue(*mut c_void);
 
 #[repr(C)] pub struct VkRenderPassBeginInfo {
 	pub s_type: VkStructureType,
-	pub p_next: *const Void,
+	pub p_next: *const c_void,
 	pub render_pass: VkRenderPass,
 	pub framebuffer: VkFramebuffer,
 	pub render_area: VkRect2D,
@@ -65,7 +65,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkSamplerCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 	pub mag_filter: VkFilter,
 	pub min_filter: VkFilter,
@@ -113,7 +113,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkSemaphoreCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 }
 
@@ -125,7 +125,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkPipelineTessellationStateCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 	pub patch_control_points: u32,
 }
@@ -142,7 +142,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkDescriptorSetLayoutCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 	pub binding_count: u32,
 	pub bindings: *const VkDescriptorSetLayoutBinding,
@@ -158,7 +158,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkPipelineLayoutCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 	pub set_layout_count: u32,
 	pub set_layouts: *const VkDescriptorSetLayout,
@@ -168,7 +168,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkGraphicsPipelineCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 	pub stage_count: u32,
 	pub stages: *const VkPipelineShaderStageCreateInfo,
@@ -190,17 +190,17 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkPipelineShaderStageCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 	pub stage: VkShaderStage,
 	pub module: VkShaderModule,
 	pub name: *const u8,
-	pub specialization_info: *const Void,
+	pub specialization_info: *const c_void,
 }
 
 #[repr(C)] pub struct VkPipelineVertexInputStateCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 	pub vertex_binding_description_count: u32,
 	pub vertex_binding_descriptions: *const VkVertexInputBindingDescription,
@@ -223,7 +223,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkPipelineInputAssemblyStateCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 	pub topology: VkPrimitiveTopology,
 	pub primitive_restart_enable: VkBool32,
@@ -231,7 +231,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkPipelineViewportStateCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 	pub viewport_count: u32,
 	pub viewports: *const VkViewport,
@@ -260,7 +260,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkPipelineRasterizationStateCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 	pub depth_clamp_enable: VkBool32,
 	pub rasterizer_discard_enable: VkBool32,
@@ -276,7 +276,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkPipelineMultisampleStateCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 	pub rasterization_samples: VkSampleCount,
 	pub sample_shading_enable: VkBool32,
@@ -288,7 +288,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkPipelineDepthStencilStateCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 	pub depth_test_enable: VkBool32,
 	pub depth_write_enable: VkBool32,
@@ -303,7 +303,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkPipelineColorBlendStateCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 	pub logic_op_enable: VkBool32,
 	pub logic_op: VkLogicOp,
@@ -325,7 +325,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkPipelineDynamicStateCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 	pub dynamic_state_count: u32,
 	pub dynamic_states: *const VkDynamicState,
@@ -333,7 +333,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkShaderModuleCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 	pub code_size: usize,
 	pub code: *const u8, // Actually u32
@@ -341,7 +341,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkDescriptorPoolCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 	pub max_sets: u32,
 	pub pool_size_count: u32,
@@ -355,7 +355,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkDescriptorSetAllocateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub descriptor_pool: VkDescriptorPool,
 	pub descriptor_set_count: u32,
 	pub set_layouts: *const VkDescriptorSetLayout,
@@ -363,7 +363,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkBufferCreateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub flags: VkFlags,
 	pub size: VkDeviceSize,
 	pub usage: VkBufferUsage,
@@ -380,7 +380,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkWriteDescriptorSet {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub dst_set: VkDescriptorSet,
 	pub dst_binding: u32,
 	pub dst_array_element: u32,
@@ -388,7 +388,7 @@ pub type VkSampleMask = u32;
 	pub descriptor_type: VkDescriptorType,
 	pub image_info: *const VkDescriptorImageInfo,
 	pub buffer_info: *const VkDescriptorBufferInfo,
-	pub texel_buffer_view: *const Void,
+	pub texel_buffer_view: *const c_void,
 }
 
 #[repr(C)] pub struct VkDescriptorImageInfo {
@@ -399,7 +399,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkFramebufferCreateInfo {
 	pub s_type: VkStructureType,
-	pub p_next: *const Void,
+	pub p_next: *const c_void,
 	pub flags: VkFlags,
 	pub render_pass: VkRenderPass,
 	pub attachment_count: u32,
@@ -411,14 +411,14 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkRenderPassCreateInfo {
 	pub s_type: VkStructureType,
-	pub p_next: *const Void,
+	pub p_next: *const c_void,
 	pub flags: VkFlags,
 	pub attachment_count: u32,
 	pub attachments: *const VkAttachmentDescription,
 	pub subpass_count: u32,
 	pub subpasses: *const VkSubpassDescription,
 	pub dependency_count: u32,
-	pub dependencies: *const Void,
+	pub dependencies: *const c_void,
 }
 
 #[repr(C)] pub struct VkSubpassDescription {
@@ -459,7 +459,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkMemoryAllocateInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub allocation_size: VkDeviceSize,
 	pub memory_type_index: u32,
 }
@@ -472,7 +472,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkImageCreateInfo {
 	pub s_type: VkStructureType,
-	pub p_next: *const Void,
+	pub p_next: *const c_void,
 	pub flags: VkFlags,
 	pub image_type: VkImageType,
 	pub format: VkFormat,
@@ -502,7 +502,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkImageMemoryBarrier {
 	pub s_type: VkStructureType,
-	pub p_next: *const Void,
+	pub p_next: *const c_void,
 	pub src_access_mask: VkAccess,
 	pub dst_access_mask: VkAccess,
 	pub old_layout: VkImageLayout,
@@ -515,7 +515,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkSubmitInfo {
 	pub s_type: VkStructureType,
-	pub p_next: *const Void,
+	pub p_next: *const c_void,
 	pub wait_semaphore_count: u32,
 	pub wait_semaphores: *const VkSemaphore,
 	pub wait_dst_stage_mask: *const VkPipelineStage,
@@ -527,7 +527,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkBufferMemoryBarrier {
 	pub s_type: VkStructureType,
-	pub p_next: *const Void,
+	pub p_next: *const c_void,
 	pub src_access_mask: VkFlags,
 	pub dst_access_mask: VkFlags,
 	pub src_queue_family_index: u32,
@@ -539,14 +539,14 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkMemoryBarrier {
 	pub s_type: VkStructureType,
-	pub p_next: *const Void,
+	pub p_next: *const c_void,
 	pub src_access_mask: VkFlags,
 	pub dst_access_mask: VkFlags,
 }
 
 #[repr(C)] pub struct VkCommandBufferInheritanceInfo {
 	pub s_type: VkStructureType,
-	pub p_next: *const Void,
+	pub p_next: *const c_void,
 	pub render_pass: VkRenderPass,
 	pub subpass: u32,
 	pub framebuffer: VkFramebuffer,
@@ -557,13 +557,13 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkFenceCreateInfo {
 	pub s_type: VkStructureType,
-	pub p_next: *const Void,
+	pub p_next: *const c_void,
 	pub flags: VkFlags,
 }
 
 #[repr(C)] pub struct VkCommandBufferBeginInfo {
 	pub s_type: VkStructureType,
-	pub p_next: *const Void,
+	pub p_next: *const c_void,
 	pub flags: VkCommandBufferUsage,
 	pub p_inheritance_info: *const VkCommandBufferInheritanceInfo,
 }
@@ -585,7 +585,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkImageViewCreateInfo {
 	pub s_type: VkStructureType,
-	pub p_next: *const Void,
+	pub p_next: *const c_void,
 	pub flags: VkFlags,
 	pub image: VkImage,
 	pub view_type: VkImageViewType,
@@ -596,7 +596,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkSwapchainCreateInfoKHR {
 	pub s_type: VkStructureType,
-	pub p_next: *const Void,
+	pub p_next: *const c_void,
 	pub flags: VkFlags,
 	pub surface: VkSurfaceKHR,
 	pub min_image_count: u32,
@@ -640,7 +640,7 @@ pub type VkSampleMask = u32;
 
 #[repr(C)] pub struct VkApplicationInfo {
 	pub s_type: VkStructureType,
-	pub p_next: *mut Void,
+	pub p_next: *mut c_void,
 	pub p_application_name: *const i8,
 	pub application_version: u32,
 	pub p_engine_name: *const i8,
@@ -650,7 +650,7 @@ pub type VkSampleMask = u32;
 
 #[derive(Debug)] #[repr(C)] pub struct VkInstanceCreateInfo {
 	pub s_type: VkStructureType,
-	pub p_next: *mut Void,
+	pub p_next: *mut c_void,
 	pub flags: u32,
 	pub p_application_info: *const VkApplicationInfo,
 	pub enabled_layer_count: u32,
@@ -668,7 +668,7 @@ pub struct VkClearDepthStencilValue {
 #[repr(C)]
 pub struct VkPresentInfo {
 	pub s_type: VkStructureType,
-	pub next: *const Void,
+	pub next: *const c_void,
 	pub wait_semaphore_count: u32,
 	pub wait_semaphores: *const VkSemaphore,
 	pub swapchain_count: u32,

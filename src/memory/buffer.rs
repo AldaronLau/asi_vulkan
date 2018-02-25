@@ -5,7 +5,7 @@
 // src/memory/buffer.rs
 
 use std::{ mem, ptr };
-use ami::Void;
+use libc::c_void;
 
 use super::Connection;
 use super::super::types::*;
@@ -18,7 +18,8 @@ pub enum BufferBuilderType {
 /// A buffer in GPU memory.
 pub struct Buffer {
 	pub buffer: VkBuffer,
-	dropfn: unsafe extern "system" fn(VkDevice, VkBuffer, *const Void) -> ()
+	dropfn: unsafe extern "system" fn(VkDevice, VkBuffer, *const c_void)
+		-> (),
 }
 
 impl Buffer {

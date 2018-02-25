@@ -5,7 +5,8 @@
 // src/image.rs
 
 use std::mem;
-use ami::Void;
+use std::ptr::null;
+use libc::c_void;
 
 use types::*;
 use Connection;
@@ -18,11 +19,11 @@ pub struct Image {
 	#[allow(unused)] // TODO
 	device: VkDevice,
 	#[allow(unused)] // TODO
-	drop_image: unsafe extern "system" fn(VkDevice, VkImage, *const Void)
+	drop_image: unsafe extern "system" fn(VkDevice, VkImage, *const c_void)
 		-> (),
 	#[allow(unused)] // TODO
 	drop_memory: unsafe extern "system" fn(VkDevice, VkDeviceMemory,
-		*const Void) -> (),
+		*const c_void) -> (),
 }
 
 impl Image {
@@ -46,7 +47,7 @@ impl Image {
 			device,
 			&VkImageCreateInfo {
 				s_type: VkStructureType::ImageCreateInfo,
-				p_next: null!(),
+				p_next: null(),
 				flags: 0,
 				image_type: VkImageType::Dim2d,
 				format,
@@ -62,10 +63,10 @@ impl Image {
 				usage,
 				sharing_mode: VkSharingMode::Exclusive,
 				queue_family_index_count: 0,
-				p_queue_family_indices: null!(),
+				p_queue_family_indices: null(),
 				initial_layout,
 			},
-			null!(),
+			null(),
 			&mut image
 		).unwrap();
 
@@ -75,7 +76,7 @@ impl Image {
 			device,
 			&VkMemoryAllocateInfo {
 				s_type: VkStructureType::MemoryAllocateInfo,
-				next: null!(),
+				next: null(),
 				allocation_size: memory_reqs.size,
 				memory_type_index: get_memory_type(
 					c,
@@ -84,7 +85,7 @@ impl Image {
 					reqs_mask
 				),
 			},
-			null!(),
+			null(),
 			&mut image_memory
 		).unwrap();
 
@@ -101,9 +102,9 @@ impl Drop for Image {
 		// TODO: image & image_memory are being moved, dropping the
 		// Image - causing them to be invalid
 //		unsafe {
-//			(self.drop_image)(self.device, self.image, null!());
+//			(self.drop_image)(self.device, self.image, null());
 //			(self.drop_memory)(self.device, self.image_memory,
-//				null!());
+//				null());
 //		}
 	}
 }

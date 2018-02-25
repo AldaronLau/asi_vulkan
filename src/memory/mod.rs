@@ -8,7 +8,7 @@
 pub mod buffer;
 
 use std::{ mem, ptr };
-use ami::Void;
+use libc::c_void;
 
 use super::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 use super::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
@@ -22,8 +22,8 @@ pub struct Memory<T> where T: Clone {
 	#[allow(unused)] // TODO
 	device: VkDevice,
 	#[allow(unused)] // TODO
-	dropfn: unsafe extern "system" fn(VkDevice, VkDeviceMemory, *const Void)
-		-> ()
+	dropfn: unsafe extern "system" fn(VkDevice, VkDeviceMemory,
+		*const c_void) -> ()
 }
 
 impl<T> Memory<T> where T: Clone {
@@ -77,7 +77,8 @@ impl<T> Memory<T> where T: Clone {
 
 		unsafe {
 			(c.mapmem)(self.device, self.memory, 0, !0, 0,
-				&mut mapped as *mut *mut _ as *mut *mut Void).unwrap();
+				&mut mapped as *mut *mut _ as *mut *mut c_void)
+				.unwrap();
 		}
 
 		if mapped.is_null() {
