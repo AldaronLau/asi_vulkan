@@ -235,15 +235,20 @@ unsafe fn load_lib() -> *mut c_void {
 	libc::dlopen(&vulkan[0] as *const _ as *const i8, 1)
 }
 
-pub unsafe fn load(app_name: &str) -> Connection {
+pub unsafe fn load(app_name: &str) -> Option<Connection> {
 	let lib = load_lib();
+
+	if lib.is_null() {
+		return None; // Vulkan doesn't exist.
+	}
+
 	let vksym = dl_sym(lib, b"vkGetInstanceProcAddr\0");
 	
 	let vk = create_instance(
 		vk_sym(mem::zeroed(), vksym, b"vkCreateInstance\0"), app_name
 	);
 
-	Connection {
+	Some(Connection {
 		vk, lib, vksym,
 		vkdsym: vk_sym(vk, vksym, b"vkGetDeviceProcAddr\0"),
 		mapmem: vk_sym(vk, vksym, b"vkMapMemory\0"),
@@ -311,7 +316,7 @@ pub unsafe fn load(app_name: &str) -> Connection {
 		destroy_fence: vk_sym(vk, vksym, b"vkDestroyFence\0"),
 		queue_present: vk_sym(vk, vksym, b"vkQueuePresentKHR\0"),
 		wait_idle: vk_sym(vk, vksym, b"vkDeviceWaitIdle\0"),
-	}
+	})
 }
 
 #[cfg(target_os = "windows")]
