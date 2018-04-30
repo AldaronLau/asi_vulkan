@@ -53,8 +53,8 @@ pub struct Connection {
 	pub mapmem: unsafe extern "system" fn(VkDevice, VkDeviceMemory,
 		VkDeviceSize, VkDeviceSize, VkFlags, *mut *mut c_void)
 		-> VkResult,
-	draw: unsafe extern "system" fn(VkCommandBuffer, u32, u32, u32, i32,
-		u32) -> (),
+	draw: unsafe extern "system" fn(VkCommandBuffer, u32, u32, u32, u32)
+		-> (),
 	unmap: unsafe extern "system" fn(VkDevice, VkDeviceMemory) -> (),
 	new_swapchain: unsafe extern "system" fn(VkDevice,
 		*const VkSwapchainCreateInfoKHR, *const c_void,
@@ -144,8 +144,6 @@ pub struct Connection {
 		*mut VkDescriptorSetLayout) -> VkResult,
 	bind_vb: unsafe extern "system" fn(VkCommandBuffer, u32, u32,
 		*const VkBuffer, *const VkDeviceSize) -> (),
-	bind_ib: unsafe extern "system" fn(VkCommandBuffer, VkBuffer,
-		VkDeviceSize, VkIndexType) -> (),
 	bind_pipeline: unsafe extern "system" fn(VkCommandBuffer,
 		VkPipelineBindPoint, VkPipeline) -> (),
 	bind_descsets: unsafe extern "system" fn(VkCommandBuffer,
@@ -249,7 +247,7 @@ pub unsafe fn load(app_name: &str) -> Connection {
 		vk, lib, vksym,
 		vkdsym: vk_sym(vk, vksym, b"vkGetDeviceProcAddr\0"),
 		mapmem: vk_sym(vk, vksym, b"vkMapMemory\0"),
-		draw: vk_sym(vk, vksym, b"vkCmdDrawIndexed\0"),
+		draw: vk_sym(vk, vksym, b"vkCmdDraw\0"),
 		unmap: vk_sym(vk, vksym, b"vkUnmapMemory\0"),
 		new_swapchain: vk_sym(vk, vksym, b"vkCreateSwapchainKHR\0"),
 		get_swapcount: vk_sym(vk, vksym, b"vkGetSwapchainImagesKHR\0"),
@@ -293,7 +291,6 @@ pub unsafe fn load(app_name: &str) -> Connection {
 		new_descset_layout:
 			vk_sym(vk, vksym, b"vkCreateDescriptorSetLayout\0"),
 		bind_vb: vk_sym(vk, vksym, b"vkCmdBindVertexBuffers\0"),
-		bind_ib: vk_sym(vk, vksym, b"vkCmdBindIndexBuffer\0"),
 		bind_pipeline: vk_sym(vk, vksym, b"vkCmdBindPipeline\0"),
 		bind_descsets: vk_sym(vk, vksym, b"vkCmdBindDescriptorSets\0"),
 		new_semaphore: vk_sym(vk, vksym, b"vkCreateSemaphore\0"),
@@ -817,11 +814,11 @@ pub unsafe fn cmd_bind_pipeline(connection: &Connection,
 }
 
 #[inline(always)] pub unsafe fn cmd_bind_vb(connection: &Connection,
-	cmd_buf: VkCommandBuffer, vertex_buffers: &[VkBuffer], offset: u64)
+	cmd_buf: VkCommandBuffer, vertex_buffers: &[VkBuffer])
 {
-	let offsets1 : [u64; 1] = [offset];
-	let offsets2 : [u64; 2] = [offset, 0];
-	let offsets3 : [u64; 3] = [offset, 0, 0];
+	let offsets1 : [u64; 1] = [0];
+	let offsets2 : [u64; 2] = [0, 0];
+	let offsets3 : [u64; 3] = [0, 0, 0];
 
 	let length = vertex_buffers.len();
 
@@ -837,21 +834,14 @@ pub unsafe fn cmd_bind_pipeline(connection: &Connection,
 			_ => panic!("Wrong number of vertex buffers (Not 1-3)"),
 		},
 	);
-
-	(connection.bind_ib)(
-		cmd_buf,
-		vertex_buffers[0],
-		0,
-		VkIndexType::Uint32,
-	);
 }
 
 pub unsafe fn cmd_draw(connection: &Connection, cmd_buf: VkCommandBuffer,
-	nvertices: u32, ninstances: u32, firstvertex: u32, vertex_offset: i32,
-	firstinstance: u32) -> ()
+	nvertices: u32, ninstances: u32, firstvertex: u32, firstinstance: u32)
 {
+	assert!(nvertices > 2);
 	(connection.draw)(cmd_buf, nvertices, ninstances, firstvertex,
-		vertex_offset, firstinstance);
+		firstinstance);
 }
 
 pub unsafe fn new_semaphore(connection: &Connection, device: VkDevice)
@@ -1595,7 +1585,6 @@ struct DescriptorSetWriter {
 	nwrites: u8,
 }
 
-// TODO: Move to asi_vulkan
 impl DescriptorSetWriter {
 	/// Create a new DescriptorSetWriter.
 	#[inline(always)]
@@ -1831,89 +1820,93 @@ pub unsafe fn vw_instance_new<T>(connection: &Connection,
 	}
 }
 
-pub unsafe fn new_shape(connection: &Connection, device: VkDevice,
-	gpu: VkPhysicalDevice, vertices: &[f32], indices: &[u32])
-	-> (VkBuffer, VkDeviceMemory, u64)
-{
-	let offset = (mem::size_of::<u32>() * indices.len()) as u64;
-	let size = (mem::size_of::<f32>() * vertices.len()) as u64 + offset;
+/// A render-able shape made of triangle strips.
+pub struct Shape {
+	pub buffers: (VkBuffer, VkDeviceMemory),
+}
 
-	let mut vertex_input_buffer = mem::uninitialized();
-	let mut vertex_buffer_memory = mem::uninitialized();
-	let mut vb_memreqs = mem::uninitialized();
+impl Shape {
+	/// Create a Shape.  `vertices` is a slice of triangle strips that make
+	/// up the shape.
+	pub fn new(connection: &Connection, device: VkDevice,
+		gpu: VkPhysicalDevice, vertices: &[f32]) -> Shape
+	{
+		let size = (mem::size_of::<f32>() * vertices.len()) as u64;
 
-	// Create Vertex Buffer
-//	let buffer = memory::buffer::Buffer::new(connection, device, size,
-//		BufferBuilderType::Vertex);
+		// Go through all of the triangle strips.
+		unsafe { // start unsafe
+			let mut vb_memreqs = mem::uninitialized();
+			let mut vertex_input_buffer = mem::uninitialized();
+			let mut vertex_buffer_memory = mem::uninitialized();
 
-	// TODO: Use `Buffer` Type
-	(connection.new_buffer)(
-		device,
-		&VkBufferCreateInfo {
-			s_type: VkStructureType::BufferCreateInfo,
-			next: null(),
-			flags: 0,
-			size: size, // size in Bytes
-			usage: VkBufferUsage::VertexIndexBufferBit,
-			sharing_mode: VkSharingMode::Exclusive,
-			queue_family_index_count: 0,
-			queue_family_indices: null(),
-		},
-		null(),
-		&mut vertex_input_buffer
-	).unwrap();
+			// Create the buffer.
+			(connection.new_buffer)(
+				device,
+				&VkBufferCreateInfo {
+					s_type: VkStructureType::BufferCreateInfo,
+					next: null(),
+					flags: 0,
+					size, // size in Bytes
+					usage: VkBufferUsage::VertexBufferBit,
+					sharing_mode: VkSharingMode::Exclusive,
+					queue_family_index_count: 0,
+					queue_family_indices: null(),
+				},
+				null(),
+				&mut vertex_input_buffer
+			).unwrap();
 
-	// Allocate memory for vertex buffer.
-	(connection.get_bufmemreq)(
-		device,
-		vertex_input_buffer,
-		&mut vb_memreqs,
-	);
+			// Allocate memory for vertex buffer.
+			(connection.get_bufmemreq)(
+				device,
+				vertex_input_buffer,
+				&mut vb_memreqs,
+			);
 
-	(connection.mem_allocate)(
-		device,
-		&VkMemoryAllocateInfo {
-			s_type: VkStructureType::MemoryAllocateInfo,
-			next: null(),
-			allocation_size: vb_memreqs.size,
-			memory_type_index: get_memory_type(
-				connection,
-				gpu,
-				vb_memreqs.memory_type_bits,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ),
-		},
-		null(),
-		&mut vertex_buffer_memory,
-	).unwrap();
+			(connection.mem_allocate)(
+				device,
+				&VkMemoryAllocateInfo {
+					s_type: VkStructureType::MemoryAllocateInfo,
+					next: null(),
+					allocation_size: vb_memreqs.size,
+					memory_type_index: get_memory_type(
+						connection,
+						gpu,
+						vb_memreqs.memory_type_bits,
+						VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ),
+				},
+				null(),
+				&mut vertex_buffer_memory,
+			).unwrap();
 
-	
-	// Copy buffer data.
-	let mut mapped = mem::uninitialized();
+			// Copy buffer data.
+			let mut mapped = mem::uninitialized();
 
-	(connection.mapmem)(
-		device,
-		vertex_buffer_memory,
-		0,
-		size,
-		0,
-		&mut mapped
-	).unwrap();
+			(connection.mapmem)(
+				device,
+				vertex_buffer_memory,
+				0,
+				size,
+				0,
+				&mut mapped
+			).unwrap();
 
-	ptr::copy_nonoverlapping(indices.as_ptr(), mapped as *mut u32,
-		indices.len());
-	ptr::copy_nonoverlapping(vertices.as_ptr(),
-		mapped.offset(offset as isize) as *mut f32, vertices.len());
+			ptr::copy_nonoverlapping(vertices.as_ptr(),
+				mapped as *mut f32, vertices.len());
 
-	(connection.unmap)(device, vertex_buffer_memory);
+			(connection.unmap)(device, vertex_buffer_memory);
 
-	(connection.bind_buffer_mem)(
-		device,
-		vertex_input_buffer,
-		vertex_buffer_memory,
-		0
-	).unwrap();
+			(connection.bind_buffer_mem)(
+				device,
+				vertex_input_buffer,
+				vertex_buffer_memory,
+				0
+			).unwrap();
 
-	(vertex_input_buffer, vertex_buffer_memory, offset)
+			// Add buffer
+			Shape { buffers: (vertex_input_buffer, vertex_buffer_memory) }
+		} // end unsafe
+	}
 }
 
 pub unsafe fn new_buffer(connection: &Connection, device: VkDevice,
@@ -1993,14 +1986,12 @@ pub unsafe fn new_buffer(connection: &Connection, device: VkDevice,
 	(vertex_input_buffer, vertex_buffer_memory)
 }
 
-// TODO: Move to asi_vulkan
 pub struct ShaderModule(
 	VkShaderModule,
 	VkDevice,
 	unsafe extern "system" fn(VkDevice, VkShaderModule, *const c_void) -> (),
 );
 
-// TODO: Move to asi_vulkan
 impl ShaderModule {
 	/// Load a new shader module into memory.
 	pub fn new(connection: &Connection, device: VkDevice,
@@ -2027,7 +2018,6 @@ impl ShaderModule {
 	}
 }
 
-// TODO: Move to asi_vulkan
 impl Drop for ShaderModule {
 	fn drop(&mut self) -> () {
 		unsafe {
@@ -2218,7 +2208,7 @@ pub fn new_pipeline(connection: &Connection,
 				s_type: VkStructureType::PipelineInputAssemblyStateCreateInfo,
 				next: null(),
 				flags: 0,
-				topology: VkPrimitiveTopology::TriangleList,
+				topology: VkPrimitiveTopology::TriangleStrip,
 				primitive_restart_enable: 0,
 			},
 			tessellation_state: null(),
