@@ -31,8 +31,6 @@ pub use self::surface::{ create_surface_windows, create_surface_xcb };
 //
 use self::types::*;
 
-const VERSION: (u32, &'static str) = (4194304, "vulkan 1.0.0");
-
 const VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT: VkFlags = 0x00000002;
 const VK_MEMORY_PROPERTY_HOST_COHERENT_BIT: VkFlags = 0x00000004;
 
@@ -235,7 +233,7 @@ unsafe fn load_lib() -> *mut c_void {
 	libc::dlopen(&vulkan[0] as *const _ as *const i8, 1)
 }
 
-pub unsafe fn load(app_name: &str) -> Option<Connection> {
+pub unsafe fn load() -> Option<Connection> {
 	let lib = load_lib();
 
 	if lib.is_null() {
@@ -245,7 +243,7 @@ pub unsafe fn load(app_name: &str) -> Option<Connection> {
 	let vksym = dl_sym(lib, b"vkGetInstanceProcAddr\0");
 	
 	let vk = create_instance(
-		vk_sym(mem::zeroed(), vksym, b"vkCreateInstance\0"), app_name
+		vk_sym(mem::zeroed(), vksym, b"vkCreateInstance\0")
 	);
 
 	Some(Connection {
@@ -369,16 +367,9 @@ unsafe fn dsym<T>(connection: &Connection, device: VkDevice, name: &[u8]) -> T {
 }
 
 unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
-	*const VkInstanceCreateInfo, *mut c_void, *mut VkInstance) -> VkResult,
-	name: &str) -> VkInstance
+	*const VkInstanceCreateInfo, *mut c_void, *mut VkInstance) -> VkResult)
+	-> VkInstance
 {
-	let engine = concat!(
-		env!("CARGO_PKG_NAME"), " ", env!("CARGO_PKG_VERSION")
-	);
-
-	let program_name : CString = CString::new(name).unwrap();
-	let engine_name : CString = CString::new(engine).unwrap();
-
 	// This variables must be defined separately so it stays in scope.
 	let validation = CString::new("VK_LAYER_LUNARG_standard_validation")
 		.unwrap();
@@ -409,11 +400,11 @@ unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
 			p_application_info: &VkApplicationInfo {
 				s_type: VkStructureType::ApplicationInfo,
 				p_next: null_mut(),
-				p_application_name: program_name.as_ptr(),
-				application_version: 2,
-				p_engine_name: engine_name.as_ptr(),
-				engine_version: 2,
-				api_version: VERSION.0,
+				p_application_name: null(),
+				application_version: 3,
+				p_engine_name: null(),
+				engine_version: 3,
+				api_version: 4194304, // 1.0.0
 			},
 			enabled_layer_count: {
 				if cfg!(feature = "checks") { 1/*2*/ } else { 0 }
@@ -432,12 +423,9 @@ unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
 		}, null_mut(), &mut instance
 	).unwrap();
 
-	println!("< adi_gpu: App: {}", name);
-	println!("< adi_gpu: Engine: {}", engine);
-	println!("< adi_gpu: Backend: {}", VERSION.1);
-	println!("< adi_gpu: Checks: {}",
-		if cfg!(feature = "checks") { "Enabled" } else { "Disabled" }
-	);
+	if cfg!(feature = "checks") {
+		println!("< Checks Enabled");
+	}
 
 	instance
 }
@@ -1084,12 +1072,12 @@ pub unsafe fn get_buffering(connection: &Connection, gpu: VkPhysicalDevice,
 		}
 	}
 
-	match image_count {
+	/*match image_count {
 		1 => println!("< adi_gpu: Buffering: Single"),
 		2 => println!("< adi_gpu: Buffering: Double"),
 		3 => println!("< adi_gpu: Buffering: Triple"),
 		_ => panic!("< adi_gpu: Image Count: {}", image_count)
-	}
+	}*/
 
 	image_count
 }
@@ -2243,7 +2231,7 @@ pub fn new_pipeline(connection: &Connection,
 				rasterizer_discard_enable: 0,
 				polygon_mode: VkPolygonMode::Fill,
 				cull_mode: VkCullMode::Back,
-				front_face: VkFrontFace::CounterClockwise,
+				front_face: VkFrontFace::Clockwise,
 				depth_bias_enable: 0,
 				depth_bias_constant_factor: 0.0,
 				depth_bias_clamp: 0.0,
