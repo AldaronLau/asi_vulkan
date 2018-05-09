@@ -418,7 +418,7 @@ pub type VkSampleMask = u32;
 	pub subpass_count: u32,
 	pub subpasses: *const VkSubpassDescription,
 	pub dependency_count: u32,
-	pub dependencies: *const c_void,
+	pub dependencies: *const VkSubpassDependency,
 }
 
 #[repr(C)] pub struct VkSubpassDescription {
@@ -675,6 +675,17 @@ pub struct VkPresentInfo {
 	pub swapchains: *const VkSwapchainKHR,
 	pub image_indices: *const u32,
 	pub results: *mut VkResult,
+}
+
+#[repr(C)]
+pub struct VkSubpassDependency {
+	pub src_subpass: u32,
+	pub dst_subpass: u32,
+	pub src_stage_mask: VkPipelineStage,
+	pub dst_stage_mask: VkPipelineStage,
+	pub src_access_mask: VkAccess,
+	pub dst_access_mask: VkAccess,
+	pub dependency_flags: u32,
 }
 
 #[derive(Copy, Clone)] #[repr(C)]
@@ -1030,6 +1041,7 @@ pub union VkClearValue {
 	TransientAttachmentBit = 0x00000040,
 	InputAttachmentBit = 0x00000080,
 	TransferDstAndUsage = 0x00000006,
+	TransientColorAttachment = 0x00000040 | 0x00000010,
 }
 
 #[repr(C)] #[allow(dead_code)] #[derive(PartialEq, Clone)]

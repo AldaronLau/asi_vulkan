@@ -31,7 +31,8 @@ impl Image {
 	#[inline(always)] pub fn new(c: &Connection, device: VkDevice,
 		gpu: VkPhysicalDevice, width: u32, height: u32,
 		format: VkFormat, tiling: VkImageTiling, usage: VkImageUsage,
-		initial_layout: VkImageLayout, reqs_mask: VkFlags) -> Image
+		initial_layout: VkImageLayout, reqs_mask: VkFlags,
+		samples: VkSampleCount) -> Image
 	{ unsafe {
 		let drop_image
 			= super::vkd_sym(device, c.vkdsym, b"vkDestroyImage\0");
@@ -58,7 +59,7 @@ impl Image {
 				},
 				mip_levels: 1,
 				array_layers: 1,
-				samples: VkSampleCount::Sc1,
+				samples,
 				tiling,
 				usage,
 				sharing_mode: VkSharingMode::Exclusive,

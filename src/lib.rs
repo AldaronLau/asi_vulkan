@@ -959,7 +959,7 @@ pub unsafe fn pipeline_barrier(connection: &Connection,
 		p_next: null(),
 		src_access_mask: VkAccess::ColorAttachmentWriteBit,
 		dst_access_mask: VkAccess::MemoryReadBit,
-		old_layout: VkImageLayout::ColorAttachmentOptimal,
+		old_layout: VkImageLayout::Undefined, // ColorAttachmentOptimal,
 		new_layout: VkImageLayout::PresentSrc,
 		src_queue_family_index: !0,
 		dst_queue_family_index: !0,
@@ -1364,6 +1364,24 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 	}
 }
 
+// TODO: in ms_buffer.rs
+#[inline(always)] pub unsafe fn create_ms_buffer(
+	connection: &Connection, device: VkDevice, gpu: VkPhysicalDevice,
+	color_format: &VkFormat, width: u32, height: u32)
+	-> (Image, VkImageView)
+{
+	let image = Image::new(connection, device, gpu, width,
+		height, color_format.clone(), VkImageTiling::Optimal,
+		VkImageUsage::TransientColorAttachment,
+		VkImageLayout::Undefined, 0, VkSampleCount::Sc4);
+
+	// create the ms image view:
+	let image_view = create_imgview(connection, device, image.image,
+		color_format.clone(), true);
+
+	(image, image_view)
+}
+
 // TODO: in depth_buffer.rs
 #[inline(always)] pub unsafe fn create_depth_buffer(
 	connection: &Connection, device: VkDevice, gpu: VkPhysicalDevice,
@@ -1374,7 +1392,7 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 	let image = Image::new(connection, device, gpu, width,
 		height, VkFormat::D16Unorm, VkImageTiling::Optimal,
 		VkImageUsage::DepthStencilAttachmentBit,
-		VkImageLayout::Undefined, 0);
+		VkImageLayout::Undefined, 0, VkSampleCount::Sc4);
 
 	// before using this depth buffer we must change it's layout:
 	(connection.begin_cmdbuff)(
@@ -1440,27 +1458,29 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 {
 	let mut render_pass = mem::uninitialized();
 
+	println!("Creating renderpass....");
+
 	(connection.new_renderpass)(
 		device,
 		&VkRenderPassCreateInfo {
 			s_type: VkStructureType::RenderPassCreateInfo,
 			p_next: null(),
 			flags: 0,
-			attachment_count: 2,
+			attachment_count: 3,
 			attachments: [
-				// Color Buffer
+				// Itermediary
 				VkAttachmentDescription {
 					flags: 0,
 					format: color_format.clone(),
-					samples: VkSampleCount::Sc1,
+					samples: VkSampleCount::Sc4,
 					load_op: VkAttachmentLoadOp::Clear,
-					store_op: VkAttachmentStoreOp::Store,
+					store_op: VkAttachmentStoreOp::DontCare,
 					stencil_load_op:
 						VkAttachmentLoadOp::DontCare,
 					stencil_store_op:
 						VkAttachmentStoreOp::DontCare,
 					initial_layout:
-					  VkImageLayout::ColorAttachmentOptimal,
+					  VkImageLayout::Undefined,
 					final_layout:
 					  VkImageLayout::ColorAttachmentOptimal,
 				},
@@ -1468,7 +1488,7 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 				VkAttachmentDescription {
 					flags: 0,
 					format: VkFormat::D16Unorm,
-					samples: VkSampleCount::Sc1,
+					samples: VkSampleCount::Sc4,
 					load_op: VkAttachmentLoadOp::Clear,
 					store_op: VkAttachmentStoreOp::DontCare,
 					stencil_load_op:
@@ -1479,6 +1499,22 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 					 VkImageLayout::DepthStencilAttachmentOptimal,
 					final_layout:
 					 VkImageLayout::DepthStencilAttachmentOptimal,
+				},
+				// Color Buffer
+				VkAttachmentDescription {
+					flags: 0,
+					format: color_format.clone(),
+					samples: VkSampleCount::Sc1,
+					load_op: VkAttachmentLoadOp::DontCare,
+					store_op: VkAttachmentStoreOp::Store,
+					stencil_load_op:
+						VkAttachmentLoadOp::DontCare,
+					stencil_store_op:
+						VkAttachmentStoreOp::DontCare,
+					initial_layout:
+					  VkImageLayout::Undefined,
+					final_layout:
+					  VkImageLayout::PresentSrc,
 				},
 			].as_ptr(),
 			subpass_count: 1,
@@ -1501,14 +1537,29 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 				input_attachments: null(),
 				preserve_attachment_count: 0,
 				preserve_attachments: null(),
-				resolve_attachments: null(),
+				resolve_attachments: &VkAttachmentReference
+				{
+					attachment: 2,
+					layout:
+					 VkImageLayout::PresentSrc,
+				},
 			},
-			dependency_count: 0,
-			dependencies: null(),
+			dependency_count: 1,
+			dependencies: &VkSubpassDependency {
+				src_subpass: !0,
+				dst_subpass: 0,
+				src_stage_mask: VkPipelineStage::ColorAttachmentOutput,
+				dst_stage_mask: VkPipelineStage::ColorAttachmentOutput,
+				src_access_mask: VkAccess::ColorAttachmentWriteBit,
+				dst_access_mask: VkAccess::ColorAttachmentReadWrite,
+				dependency_flags: 0,
+			},
 		},
 		null(),
 		&mut render_pass
 	).unwrap();
+
+	println!("CreatED renderpass....");
 
 	render_pass
 }
@@ -1516,8 +1567,8 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 #[inline(always)] pub unsafe fn create_framebuffers(
 	connection: &Connection, device: VkDevice, image_count: u32,
 	render_pass: VkRenderPass, present_imgviews: &[VkImageView],
-	depth_imgview: VkImageView, width: u32, height: u32,
-	fbs: &mut[VkFramebuffer])
+	multisample_imgview: VkImageView, depth_imgview: VkImageView,
+	width: u32, height: u32, fbs: &mut[VkFramebuffer])
 {
 	// create a framebuffer per swap chain imageView:
 	for i in 0..(image_count as usize) {
@@ -1527,10 +1578,11 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 				s_type: VkStructureType::FramebufferCreateInfo,
 				p_next: null(),
 				flags: 0,
-				attachment_count: 2,
+				attachment_count: 3,
 				attachments: [
-					present_imgviews[i],
+					multisample_imgview,
 					depth_imgview,
+					present_imgviews[i],
 				].as_ptr(),
 				layers: 1,
 				render_pass, width, height,
@@ -2242,7 +2294,7 @@ pub fn new_pipeline(connection: &Connection,
 				s_type: VkStructureType::PipelineMultisampleStateCreateInfo,
 				next: null(),
 				flags: 0,
-				rasterization_samples: VkSampleCount::Sc1,
+				rasterization_samples: VkSampleCount::Sc4,
 				sample_shading_enable: 0,
 				min_sample_shading: 0.0,
 				sample_mask: null(),
