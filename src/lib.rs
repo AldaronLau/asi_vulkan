@@ -34,6 +34,8 @@ use self::types::*;
 const VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT: VkFlags = 0x00000002;
 const VK_MEMORY_PROPERTY_HOST_COHERENT_BIT: VkFlags = 0x00000004;
 
+const VK_SAMPLE_COUNT: VkSampleCount = VkSampleCount::Sc8;
+
 // Link to Kernel32
 #[cfg(target_os = "windows")]
 extern "system" {
@@ -1373,7 +1375,7 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 	let image = Image::new(connection, device, gpu, width,
 		height, color_format.clone(), VkImageTiling::Optimal,
 		VkImageUsage::TransientColorAttachment,
-		VkImageLayout::Undefined, 0, VkSampleCount::Sc4);
+		VkImageLayout::Undefined, 0, VK_SAMPLE_COUNT);
 
 	// create the ms image view:
 	let image_view = create_imgview(connection, device, image.image,
@@ -1392,7 +1394,7 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 	let image = Image::new(connection, device, gpu, width,
 		height, VkFormat::D16Unorm, VkImageTiling::Optimal,
 		VkImageUsage::DepthStencilAttachmentBit,
-		VkImageLayout::Undefined, 0, VkSampleCount::Sc4);
+		VkImageLayout::Undefined, 0, VK_SAMPLE_COUNT);
 
 	// before using this depth buffer we must change it's layout:
 	(connection.begin_cmdbuff)(
@@ -1472,7 +1474,7 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 				VkAttachmentDescription {
 					flags: 0,
 					format: color_format.clone(),
-					samples: VkSampleCount::Sc4,
+					samples: VK_SAMPLE_COUNT,
 					load_op: VkAttachmentLoadOp::Clear,
 					store_op: VkAttachmentStoreOp::DontCare,
 					stencil_load_op:
@@ -1488,7 +1490,7 @@ pub unsafe fn wait_fence(connection: &Connection, device: VkDevice,
 				VkAttachmentDescription {
 					flags: 0,
 					format: VkFormat::D16Unorm,
-					samples: VkSampleCount::Sc4,
+					samples: VK_SAMPLE_COUNT,
 					load_op: VkAttachmentLoadOp::Clear,
 					store_op: VkAttachmentStoreOp::DontCare,
 					stencil_load_op:
@@ -2294,7 +2296,7 @@ pub fn new_pipeline(connection: &Connection,
 				s_type: VkStructureType::PipelineMultisampleStateCreateInfo,
 				next: null(),
 				flags: 0,
-				rasterization_samples: VkSampleCount::Sc4,
+				rasterization_samples: VK_SAMPLE_COUNT,
 				sample_shading_enable: 0,
 				min_sample_shading: 0.0,
 				sample_mask: null(),
