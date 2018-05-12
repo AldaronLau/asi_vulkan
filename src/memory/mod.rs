@@ -4,16 +4,17 @@
 //
 // src/memory/mod.rs
 
-// TODO: pub?
-pub mod buffer;
-
 use std::{ mem, ptr };
 use libc::c_void;
 
-use super::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-use super::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-use super::Connection;
-use super::types::*;
+use VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+use VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+use vulkan;
+use Vk;
+use types::*;
+
+// TODO: pub?
+pub mod buffer;
 
 pub struct Memory<T> where T: Clone {
 	pub data: T,
@@ -29,22 +30,24 @@ pub struct Memory<T> where T: Clone {
 impl<T> Memory<T> where T: Clone {
 	/// Allocate memory in a GPU buffer.
 	#[inline(always)]
-	pub fn new(c: &Connection, device: VkDevice, gpu: VkPhysicalDevice,
-		data: T) -> Memory<T>
+	pub fn new(vulkan: &mut Vk, device: VkDevice,
+		gpu: VkPhysicalDevice, data: T) -> Memory<T>
 	{
-		let buffer = buffer::Buffer::new(c, device, mem::size_of::<T>(),
+//		let c = vulkan.0.data();
+
+		let buffer = buffer::Buffer::new(vulkan.0.data(), device, mem::size_of::<T>(),
 			buffer::BufferBuilderType::Uniform);
 		let mut memory = unsafe { mem::uninitialized() };
-		let mem_reqs = buffer.get_reqs(c, device);
+		let mem_reqs = buffer.get_reqs(vulkan.0.data(), device);
 		unsafe {
-			(c.mem_allocate)(
+			(vulkan.0.data().mem_allocate)(
 				device,
 				&VkMemoryAllocateInfo {
 					s_type: VkStructureType::MemoryAllocateInfo,
 					next: ptr::null(),
 					allocation_size: mem_reqs.size,
 					memory_type_index: super::get_memory_type(
-						c,
+						vulkan,
 						gpu,
 						mem_reqs.memory_type_bits,
 						VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -55,24 +58,26 @@ impl<T> Memory<T> where T: Clone {
 			).unwrap();
 		}
 		let dropfn = unsafe {
-			super::vkd_sym(device, c.vkdsym, b"vkFreeMemory\0")
+			vulkan::dsym(vulkan.0.data(), device, b"vkFreeMemory\0")
 		};
 
 		unsafe {
-			(c.bind_buffer_mem)(device, buffer.buffer, memory, 0)
+			(vulkan.0.data().bind_buffer_mem)(device, buffer.buffer, memory, 0)
 				.unwrap();
 		}
 
 		let memory = Memory { data, memory, buffer, device, dropfn };
 
-		memory.update(c);
+		memory.update(vulkan);
 
 		memory
 	}
 
 	/// Update the contents of the memory.
 	#[inline(always)]
-	pub fn update(&self, c: &Connection) {
+	pub fn update(&self, vulkan: &mut Vk) {
+		let c = vulkan.0.data();
+
 		let mut mapped: *mut T = unsafe { mem::uninitialized() }; // void *
 
 		unsafe {

@@ -7,8 +7,9 @@
 use std::{ mem, ptr };
 use libc::c_void;
 
-use super::Connection;
-use super::super::types::*;
+use vulkan;
+use Vulkan;
+use types::*;
 
 pub enum BufferBuilderType {
 	Uniform,
@@ -25,7 +26,7 @@ pub struct Buffer {
 impl Buffer {
 	/// Create a new buffer on the GPU.
 	#[inline(always)]
-	pub fn new(c: &Connection, device: VkDevice, nbytes: usize,
+	pub fn new(c: &Vulkan, device: VkDevice, nbytes: usize,
 		bbt: BufferBuilderType) -> Buffer
 	{
 		let mut buffer = unsafe { mem::uninitialized() };
@@ -52,14 +53,14 @@ impl Buffer {
 			).unwrap();
 		}
 		let dropfn = unsafe {
-			super::super::vkd_sym(device, c.vkdsym, b"vkDestroyBuffer\0")
+			vulkan::dsym(c, device, b"vkDestroyBuffer\0")
 		};
 		Buffer { buffer, dropfn }
 	}
 
 	/// Get Memory Requirements.
 	#[inline(always)]
-	pub fn get_reqs(&self, connection: &Connection, device: VkDevice)
+	pub fn get_reqs(&self, connection: &Vulkan, device: VkDevice)
 		-> VkMemoryRequirements
 	{
 		let mut mem_reqs = unsafe { mem::uninitialized() };

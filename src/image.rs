@@ -5,11 +5,12 @@
 // src/image.rs
 
 use std::mem;
-use std::ptr::null;
+use std::ptr::{ null };
 use libc::c_void;
 
+use Vk;
+use vulkan;
 use types::*;
-use Connection;
 use get_memory_type;
 
 /// An Image
@@ -28,23 +29,25 @@ pub struct Image {
 
 impl Image {
 	/// Create a new image.
-	#[inline(always)] pub fn new(c: &Connection, device: VkDevice,
+	#[inline(always)] pub fn new(vulkan: &mut Vk, device: VkDevice,
 		gpu: VkPhysicalDevice, width: u32, height: u32,
 		format: VkFormat, tiling: VkImageTiling, usage: VkImageUsage,
 		initial_layout: VkImageLayout, reqs_mask: VkFlags,
 		samples: VkSampleCount) -> Image
 	{ unsafe {
+//		let c = vulkan.0.data();
+
 		let drop_image
-			= super::vkd_sym(device, c.vkdsym, b"vkDestroyImage\0");
+			= vulkan::dsym(vulkan.0.data(), device, b"vkDestroyImage\0");
 		let drop_memory =
-			super::vkd_sym(device, c.vkdsym, b"vkFreeMemory\0");
+			vulkan::dsym(vulkan.0.data(), device, b"vkFreeMemory\0");
 
 		let mut image = mem::uninitialized();
 		let mut image_memory = mem::uninitialized();
 
 		let mut memory_reqs = mem::uninitialized();
 
-		(c.create_image)(
+		(vulkan.0.data().create_image)(
 			device,
 			&VkImageCreateInfo {
 				s_type: VkStructureType::ImageCreateInfo,
@@ -71,16 +74,16 @@ impl Image {
 			&mut image
 		).unwrap();
 
-		(c.get_imgmemreq)(device, image, &mut memory_reqs);
+		(vulkan.0.data().get_imgmemreq)(device, image, &mut memory_reqs);
 
-		(c.mem_allocate)(
+		(vulkan.0.data().mem_allocate)(
 			device,
 			&VkMemoryAllocateInfo {
 				s_type: VkStructureType::MemoryAllocateInfo,
 				next: null(),
 				allocation_size: memory_reqs.size,
 				memory_type_index: get_memory_type(
-					c,
+					vulkan,
 					gpu,
 					memory_reqs.memory_type_bits,
 					reqs_mask
@@ -90,7 +93,7 @@ impl Image {
 			&mut image_memory
 		).unwrap();
 
-		(c.bind_imgmem)(device, image, image_memory, 0)
+		(vulkan.0.data().bind_imgmem)(device, image, image_memory, 0)
 			.unwrap();
 
 		Image { image, image_memory, device, drop_image, drop_memory }

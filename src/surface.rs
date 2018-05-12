@@ -6,12 +6,59 @@
 
 // TODO: Make surface a buffer and blit onto screen with window manager.
 
-use std::mem;
-use std::ptr::null_mut;
+use std::{ mem, ptr::{ null_mut } };
 use libc::c_void;
+use ami::{ PseudoDrop, Child };
 
-use super::types::*;
-use super::Connection;
+use vulkan;
+use types::*;
+use Vk;
+use Vulkan;
+
+pub struct Surface(pub(crate)Child<Vulkan, VkSurfaceKHR>);
+
+impl Surface {
+	/// Create a new surface on a Windows Window
+	pub fn new_windows(vulkan: &mut Vk, connection: *mut c_void,
+		window: *mut c_void) -> Self
+	{
+		let c = vulkan.0.data();
+
+		Surface(Child::new(&vulkan.0, create_surface_windows(c, connection, window)))
+	}
+
+	/// Create a new surface on an XCB Window
+	pub fn new_xcb(vulkan: &mut Vk, connection: *mut c_void,
+		window: u32) -> Self
+	{
+		let c = vulkan.0.data();
+
+		Surface(Child::new(&vulkan.0, create_surface_xcb(c, connection, window)))
+	}
+}
+
+impl PseudoDrop for VkSurfaceKHR {
+	type T = Vulkan;
+
+	fn pdrop(&mut self, vulkan: &mut Vulkan) -> () {
+		let c = vulkan;
+
+		// Load Drop Function
+		type VkDestroySurface = unsafe extern "system" fn(
+			instance: VkInstance, surface: VkSurfaceKHR,
+			pAllocator: *mut c_void) -> ();
+		let destroy: VkDestroySurface = unsafe {
+			vulkan::vk_sym(c.vk, c.vksym, b"vkDestroySurfaceKHR\0")
+		};
+
+		// Run Drop Function
+		unsafe {
+			destroy(c.vk, *self, null_mut())
+		};
+
+		println!("TEST: Drop Surface");
+	}
+}
 
 #[cfg(unix)] #[repr(C)]
 struct SurfaceCreateInfoXcb {
@@ -41,25 +88,25 @@ struct SurfaceCreateInfoAndroid {
 }
 
 #[cfg(not(unix))]
-pub fn create_surface_xcb(_: &Connection, _: VkInstance, _: *mut c_void, _: u32)
+fn create_surface_xcb(_: &Vulkan, _: *mut c_void, _: u32)
 	-> VkSurfaceKHR
 {
 	panic!("Can't create XCB surface on not Unix.");
 }
 
 #[cfg(unix)]
-pub fn create_surface_xcb(c: &Connection, instance: VkInstance,
-	connection: *mut c_void, window: u32) -> VkSurfaceKHR
+fn create_surface_xcb(c: &Vulkan, connection: *mut c_void, window: u32)
+	-> VkSurfaceKHR
 {
 	let mut surface = unsafe { mem::uninitialized() };
 	let surface_create_info = SurfaceCreateInfoXcb {
 		s_type: VkStructureType::SurfaceCreateInfoXcb,
 		p_next: null_mut(),
 		flags: 0,
-		connection: connection,
-		window: window,
+		connection,
+		window,
 	};
-	
+
 	let create_surface : unsafe extern "system" fn(
 		instance: VkInstance,
 		pCreateInfo: *const SurfaceCreateInfoXcb,
@@ -67,12 +114,12 @@ pub fn create_surface_xcb(c: &Connection, instance: VkInstance,
 		surface: *mut VkSurfaceKHR) -> VkResult
 		= unsafe
 	{
-		super::vk_sym(instance, c.vksym, b"vkCreateXcbSurfaceKHR\0")
+		vulkan::sym(c, b"vkCreateXcbSurfaceKHR\0")
 	};
 
 	unsafe {
-		(create_surface)(instance,
-			&surface_create_info, null_mut(), &mut surface)
+		(create_surface)(c.vk, &surface_create_info, null_mut(),
+			&mut surface)
 		.unwrap();
 	};
 
@@ -80,15 +127,15 @@ pub fn create_surface_xcb(c: &Connection, instance: VkInstance,
 }
 
 #[cfg(not(target_os = "windows"))]
-pub fn create_surface_windows(_: &Connection, _: VkInstance, _: *mut c_void,
-	_: *mut c_void) -> VkSurfaceKHR
+fn create_surface_windows(_: &Vulkan, _: *mut c_void, _: *mut c_void)
+	-> VkSurfaceKHR
 {
 	panic!("Can't create Windows surface on not Windows.");
 }
 
 #[cfg(target_os = "windows")]
-pub fn create_surface_windows(c: &Connection, instance: VkInstance,
-	connection: *mut c_void, window: *mut c_void) -> VkSurfaceKHR
+fn create_surface_windows(c: &Vulkan, connection: *mut c_void,
+	window: *mut c_void) -> VkSurfaceKHR
 {
 	let mut surface = unsafe { mem::uninitialized() };
 	let surface_create_info = SurfaceCreateInfoWindows {
@@ -106,11 +153,11 @@ pub fn create_surface_windows(c: &Connection, instance: VkInstance,
 		surface: *mut VkSurfaceKHR) -> VkResult
 		= unsafe
 	{
-		super::vk_sym(instance, c.vksym, b"vkCreateWin32SurfaceKHR\0")
+		vulkan::sym(c, b"vkCreateWin32SurfaceKHR\0")
 	};
 
 	unsafe {
-		(create_surface)(instance, &surface_create_info, null_mut(),
+		(create_surface)(c.vk, &surface_create_info, null_mut(),
 			&mut surface)
 		.unwrap();
 	};
@@ -120,12 +167,12 @@ pub fn create_surface_windows(c: &Connection, instance: VkInstance,
 
 // TODO
 /* #[cfg(not(target_os = "android"))]
-pub fn create_surface_android(_: VkInstance, _: *mut c_void) -> VkSurfaceKHR {
+fn create_surface_android(_: VkInstance, _: *mut c_void) -> VkSurfaceKHR {
 	panic!("Can't create Android surface on not Android.");
 }
 
 #[cfg(target_os = "android")]
-pub fn create_surface_android(instance: VkInstance, window: *mut c_void)
+fn create_surface_android(c: &Vulkan, window: *mut c_void)
 	-> VkSurfaceKHR
 {
 	let mut surface = unsafe { mem::uninitialized() };
@@ -144,7 +191,7 @@ pub fn create_surface_android(instance: VkInstance, window: *mut c_void)
 				surface: *mut VkSurfaceKHR) -> VkResult;
 		}
 		check_error(ERROR, vkCreateAndroidSurfaceKHR(
-			instance, &surface_create_info, null_mut(), &mut surface
+			c.vk, &surface_create_info, null_mut(), &mut surface
 		));
 	};
 
