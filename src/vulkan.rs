@@ -383,8 +383,39 @@ impl Vulkan {
 	}
 }
 
+pub enum VkType {
+	Surface,
+}
+
+pub struct VkObject {
+	vk_type: VkType,
+	value_a: u64,
+}
+
+impl VkObject {
+	pub fn new(vk_type: VkType, value_a: u64) -> Self {
+		VkObject { vk_type, value_a }
+	}
+
+	pub fn surface(&self) -> VkSurfaceKHR {
+		self.value_a
+	}
+}
+
+impl ::ami::PseudoDrop for VkObject {
+	type T = Vulkan;
+
+	fn pdrop(&mut self, vulkan: &mut Vulkan) -> () {
+		use VkType::*;
+
+		match self.vk_type {
+			Surface => ::surface::destroy(self.surface(), vulkan),
+		}
+	}
+}
+
 /// The Vulkan Instance Handle
-pub struct Vk(pub(crate) Parent<Vulkan, VkSurfaceKHR>);
+pub struct Vk(pub(crate) Parent<Vulkan, VkObject>);
 
 impl Vk {
 	/// Load the Vulkan library, returns None on failure.

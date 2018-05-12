@@ -8,14 +8,16 @@
 
 use std::{ mem, ptr::{ null_mut } };
 use libc::c_void;
-use ami::{ PseudoDrop, Child };
+use ami::{ Child };
 
 use vulkan;
 use types::*;
 use Vk;
 use Vulkan;
+use VkObject;
+use VkType;
 
-pub struct Surface(pub(crate)Child<Vulkan, VkSurfaceKHR>);
+pub struct Surface(pub(crate)Child<Vulkan, VkObject>);
 
 impl Surface {
 	/// Create a new surface on a Windows Window
@@ -24,7 +26,8 @@ impl Surface {
 	{
 		let c = vulkan.0.data();
 
-		Surface(Child::new(&vulkan.0, create_surface_windows(c, connection, window)))
+		Surface(Child::new(&vulkan.0, VkObject::new(VkType::Surface,
+			create_surface_windows(c, connection, window))))
 	}
 
 	/// Create a new surface on an XCB Window
@@ -33,31 +36,30 @@ impl Surface {
 	{
 		let c = vulkan.0.data();
 
-		Surface(Child::new(&vulkan.0, create_surface_xcb(c, connection, window)))
+		Surface(Child::new(&vulkan.0, VkObject::new(VkType::Surface,
+			create_surface_xcb(c, connection, window))))
+	}
+
+	pub(crate) fn surface(&self) -> VkSurfaceKHR {
+		self.0.data().surface()
 	}
 }
 
-impl PseudoDrop for VkSurfaceKHR {
-	type T = Vulkan;
+pub(crate) fn destroy(surface: u64, vulkan: &mut Vulkan) -> () {
+	let c = vulkan;
 
-	fn pdrop(&mut self, vulkan: &mut Vulkan) -> () {
-		let c = vulkan;
+	// Load Drop Function
+	type VkDestroySurface = unsafe extern "system" fn(
+		instance: VkInstance, surface: VkSurfaceKHR,
+		pAllocator: *mut c_void) -> ();
+	let destroy: VkDestroySurface = unsafe {
+		vulkan::vk_sym(c.vk, c.vksym, b"vkDestroySurfaceKHR\0")
+	};
 
-		// Load Drop Function
-		type VkDestroySurface = unsafe extern "system" fn(
-			instance: VkInstance, surface: VkSurfaceKHR,
-			pAllocator: *mut c_void) -> ();
-		let destroy: VkDestroySurface = unsafe {
-			vulkan::vk_sym(c.vk, c.vksym, b"vkDestroySurfaceKHR\0")
-		};
+	// Run Drop Function
+	unsafe { destroy(c.vk, surface, null_mut()) };
 
-		// Run Drop Function
-		unsafe {
-			destroy(c.vk, *self, null_mut())
-		};
-
-		println!("TEST: Drop Surface");
-	}
+	println!("TEST: Drop Surface");
 }
 
 #[cfg(unix)] #[repr(C)]

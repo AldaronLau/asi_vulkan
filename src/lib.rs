@@ -32,7 +32,7 @@ pub use self::vulkan::Vk;
 
 //
 use self::types::*;
-use self::vulkan::Vulkan;
+use self::vulkan::{ Vulkan, VkObject, VkType };
 
 const VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT: VkFlags = 0x00000002;
 const VK_MEMORY_PROPERTY_HOST_COHERENT_BIT: VkFlags = 0x00000004;
@@ -129,7 +129,7 @@ pub unsafe fn get_gpu(connection: &mut Vk, surface: &Surface)
 			let k = j as u32;
 			let mut supports_present = 0;
 
-			vk_get_support(gpus[i], k, *surface.0.data(),
+			vk_get_support(gpus[i], k, surface.surface(),
 				&mut supports_present).unwrap();
 
 			if supports_present != 0 &&
@@ -716,7 +716,7 @@ pub unsafe fn get_color_format(connection: &mut Vk, gpu: VkPhysicalDevice,
 	let mut format = mem::uninitialized();
 
 	// Run Function
-	get_gpu_surface_formats(gpu, *surface.0.data(), &mut nformats,
+	get_gpu_surface_formats(gpu, surface.surface(), &mut nformats,
 		&mut format).unwrap();
 
 	// Process data
@@ -736,7 +736,7 @@ pub unsafe fn get_buffering(connection: &mut Vk, gpu: VkPhysicalDevice,
 	let mut surface_info = mem::uninitialized();
 
 	// Run Function
-	(connection.get_surface_capabilities)(gpu, *surface.0.data(),
+	(connection.get_surface_capabilities)(gpu, surface.surface(),
 		&mut surface_info).unwrap();
 
 	// Process data
@@ -781,7 +781,7 @@ pub unsafe fn get_present_mode(connection: &mut Vk, gpu: VkPhysicalDevice,
 	let mut npresentmodes = mem::uninitialized();
 
 	// Run Function
-	vk_get_present_modes(gpu, *surface.0.data(), &mut npresentmodes,
+	vk_get_present_modes(gpu, surface.surface(), &mut npresentmodes,
 		null_mut()).unwrap();
 
 	// Set Data
@@ -790,8 +790,8 @@ pub unsafe fn get_present_mode(connection: &mut Vk, gpu: VkPhysicalDevice,
 		npresentmodes_usize];
 
 	// Run Function
-	vk_get_present_modes(gpu, *surface.0.data(), &mut npresentmodes,
-		present_modes.as_mut_ptr()).unwrap();
+	vk_get_present_modes(gpu, surface.surface(),
+		&mut npresentmodes, present_modes.as_mut_ptr()).unwrap();
 
 	// Process Data
 	for i in 0..npresentmodes_usize {
@@ -841,7 +841,7 @@ pub unsafe fn get_present_mode(connection: &mut Vk, gpu: VkPhysicalDevice,
 {
 	let connection = connection.0.data();
 
-	let surface = *surface.0.data();
+	let surface = surface.surface();
 
 	(connection.get_surface_capabilities)(gpu, surface,
 		&mut mem::uninitialized()).unwrap();

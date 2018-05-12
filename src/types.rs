@@ -13,24 +13,25 @@ pub type VkBool32 = u32;
 pub type VkSampleMask = u32;
 
 // Non-Dispatchable Handles
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSurfaceKHR(u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDeviceMemory(u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkImage(u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSwapchainKHR(u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkRenderPass(u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkFramebuffer(u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkFence(u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSemaphore(pub u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkImageView(u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkBuffer(pub u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkShaderModule(u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipeline(u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorSetLayout(u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipelineLayout(u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSampler(u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorSet(u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorPool(u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipelineCache(u64);
+pub type VkSurfaceKHR = u64;
+// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSurfaceKHR(pub(crate) u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDeviceMemory(pub(crate) u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkImage(pub(crate) u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSwapchainKHR(pub(crate) u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkRenderPass(pub(crate) u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkFramebuffer(pub(crate) u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkFence(pub(crate) u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSemaphore(pub(crate)  u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkImageView(pub(crate) u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkBuffer(pub(crate)  u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkShaderModule(pub(crate) u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipeline(pub(crate) u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorSetLayout(pub(crate) u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipelineLayout(pub(crate) u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSampler(pub(crate) u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorSet(pub(crate) u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorPool(pub(crate) u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipelineCache(pub(crate) u64);
 
 // Dispatchable Handles
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDevice(*mut c_void);
