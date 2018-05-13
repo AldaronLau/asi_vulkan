@@ -168,6 +168,7 @@ pub struct Vulkan {
 	pub(crate) device: VkDevice,
 	pub(crate) command_buffer: VkCommandBuffer,
 	pub(crate) command_pool: u64,
+	pub(crate) sampler: VkSampler,
 	pub(crate) lib: *mut c_void,
 	pub(crate) vksym: unsafe extern "system" fn(VkInstance, *const i8) -> *mut c_void,
 	pub(crate) vkdsym: unsafe extern "system" fn(VkDevice, *const i8) -> *mut c_void,
@@ -328,6 +329,7 @@ impl Vulkan {
 			device: ::std::mem::uninitialized(),
 			command_buffer: ::std::mem::uninitialized(),
 			command_pool: ::std::mem::uninitialized(),
+			sampler: ::std::mem::uninitialized(),
 			vkdsym: vk_sym(vk, vksym, b"vkGetDeviceProcAddr\0"),
 			mapmem: vk_sym(vk, vksym, b"vkMapMemory\0"),
 			draw: vk_sym(vk, vksym, b"vkCmdDraw\0"),
@@ -453,6 +455,16 @@ impl Vk {
 
 impl Drop for Vulkan {
 	fn drop(&mut self) -> () {
+		// Load Function (Sampler)
+		type VkDestroySampler = unsafe extern "system" fn(
+			VkDevice, VkSampler, *const c_void) -> ();
+		let destroy: VkDestroySampler = unsafe {
+			sym(self, b"vkDestroySampler\0")
+		};
+
+		// Run Function (Sampler)
+		unsafe { destroy(self.device, self.sampler, null()) }
+
 		// Load Function (Command Buffer & Command Pool)
 		type VkDestroyCommandPool = unsafe extern "system" fn(
 			VkDevice, u64, *const c_void) -> ();
@@ -461,7 +473,7 @@ impl Drop for Vulkan {
 		};
 
 		// Run Function (Command Buffer & Command Pool)
-		unsafe { destroy(self.device, self.command_pool, null()) };
+		unsafe { destroy(self.device, self.command_pool, null()) }
 
 		// Load Function (Surface)
 		type VkDestroySurface = unsafe extern "system" fn(
@@ -472,7 +484,7 @@ impl Drop for Vulkan {
 		};
 
 		// Run Function (Surface)
-		unsafe { destroy(self.vk, self.surface, null_mut()) };
+		unsafe { destroy(self.vk, self.surface, null_mut()) }
 
 		// Load Function
 		type VkDestroyInstance = unsafe extern "system" fn(
@@ -483,7 +495,7 @@ impl Drop for Vulkan {
 		};
 
 		// Run Function
-		unsafe { destroy(self.vk, null_mut()) };
+		unsafe { destroy(self.vk, null_mut()) }
 		// TODO: Drop lib in asi
 		println!("FIXME: DROP {:?}", self.lib);
 	}

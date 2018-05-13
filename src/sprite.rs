@@ -34,9 +34,8 @@ impl Sprite {
 	pub unsafe fn new<T>(vulkan: &mut Vk, pipeline: Style,
 		buffer_data: T, camera_memory: &Memory<TransformUniform>,
 		effect_memory: &Memory<FogUniform>,
-		tex_view: VkImageView, tex_sampler: VkSampler, tex_count: bool)
-		-> Self
-		where T: Clone
+		tex_view: VkImageView, tex_count: bool)
+		 -> Self where T: Clone
 	{
 	//	let connection = vulkan.0.data();
 
@@ -105,8 +104,8 @@ impl Sprite {
 	// }
 		let device = vulkan.0.data().device;
 
-		txuniform(vulkan, device, desc_set, tex_count, tex_sampler,
-			tex_view, &uniform_memory, &camera_memory, &effect_memory);
+		txuniform(vulkan, device, desc_set, tex_count, tex_view,
+			&uniform_memory, &camera_memory, &effect_memory);
 
 		println!("NEW: Drop Desc Pool & Attached Sets");
 
@@ -125,9 +124,8 @@ impl Sprite {
 }
 
 unsafe fn txuniform<T>(vulkan: &mut Vk, device: VkDevice,
-	desc_set: VkDescriptorSet, hastex: bool, tex_sampler: VkSampler,
-	tex_view: VkImageView, matrix_memory: &Memory<T>,
-	camera_memory: &Memory<TransformUniform>,
+	desc_set: VkDescriptorSet, hastex: bool, tex_view: VkImageView,
+	matrix_memory: &Memory<T>, camera_memory: &Memory<TransformUniform>,
 	effect_memory: &Memory<FogUniform>) where T: Clone
 {
 	let mut writer = DescriptorSetWriter::new()
@@ -136,7 +134,8 @@ unsafe fn txuniform<T>(vulkan: &mut Vk, device: VkDevice,
 		.uniform(desc_set, effect_memory);
 
 	if hastex {
-		writer = writer.sampler(desc_set, tex_sampler, tex_view);
+		writer = writer.sampler(desc_set, vulkan.0.data().sampler,
+			tex_view);
 	}
 
 	writer.update_descriptor_sets(vulkan, device);

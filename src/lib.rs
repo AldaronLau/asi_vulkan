@@ -319,10 +319,8 @@ pub unsafe fn create_command_buffer(connection: &mut Vk) {
 	connection.command_pool = command_pool;
 }
 
-pub unsafe fn new_sampler(connection: &mut Vk) -> VkSampler {
+pub unsafe fn new_sampler(connection: &mut Vk) {
 	let connection = connection.0.data();
-
-	let mut sampler = mem::uninitialized();
 
 	(connection.new_sampler)(
 		connection.device,
@@ -347,10 +345,8 @@ pub unsafe fn new_sampler(connection: &mut Vk) -> VkSampler {
 			unnormalized_coordinates: 0,
 		},
 		null(),
-		&mut sampler
+		&mut connection.sampler
 	).unwrap();
-
-	sampler
 }
 
 pub unsafe fn subres_layout(connection: &mut Vk, image: &Image)
