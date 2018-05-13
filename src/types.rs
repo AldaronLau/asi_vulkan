@@ -16,6 +16,8 @@ pub type VkSampleMask = u32;
 pub type VkSurfaceKHR = u64;
 pub type VkImage = u64;
 pub type VkDeviceMemory = u64;
+pub type VkDescriptorSet = u64;
+pub type VkDescriptorPool = u64;
 // #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSurfaceKHR(pub(crate) u64);
 // #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDeviceMemory(pub(crate) u64);
 // #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkImage(pub(crate) u64);
@@ -31,8 +33,8 @@ pub type VkDeviceMemory = u64;
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorSetLayout(pub(crate) u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipelineLayout(pub(crate) u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSampler(pub(crate) u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorSet(pub(crate) u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorPool(pub(crate) u64);
+// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorSet(pub(crate) u64);
+// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorPool(pub(crate) u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipelineCache(pub(crate) u64);
 
 // Dispatchable Handles

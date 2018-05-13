@@ -401,6 +401,7 @@ impl Vulkan {
 
 pub enum VkType {
 	Image,
+	Sprite,
 }
 
 pub struct VkObject {
@@ -425,6 +426,7 @@ impl ::ami::PseudoDrop for VkObject {
 
 		match self.vk_type {
 			Image => ::image::destroy(self.image(), vulkan),
+			Sprite => ::sprite::destroy(self.image(), vulkan),
 		}
 	}
 }
