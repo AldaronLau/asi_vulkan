@@ -58,8 +58,7 @@ pub struct Style {
 	pub fogr: [f32; 2],
 }
 
-// TODO
-#[derive(Copy, Clone)]
+/// A render-able instance.
 pub struct VwInstance {
 	pub matrix_buffer: VkBuffer,
 	pub uniform_memory: VkDeviceMemory,
