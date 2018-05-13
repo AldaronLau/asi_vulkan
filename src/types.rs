@@ -36,10 +36,11 @@ pub type VkDeviceMemory = u64;
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipelineCache(pub(crate) u64);
 
 // Dispatchable Handles
+pub type VkCommandBuffer = *mut c_void;
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDevice(*mut c_void);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPhysicalDevice(*mut c_void);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkInstance(*mut c_void);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkCommandBuffer(*mut c_void);
+// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkCommandBuffer(*mut c_void);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkQueue(*mut c_void);
 
 #[repr(C)] pub struct VkRenderPassBeginInfo {

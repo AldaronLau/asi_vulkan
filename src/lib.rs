@@ -255,9 +255,7 @@ pub unsafe fn wait_idle(connection: &mut Vk) {
 	(connection.wait_idle)(connection.device).unwrap();
 }
 
-pub unsafe fn create_command_buffer(connection: &mut Vk)
-	-> (VkCommandBuffer, u64)
-{
+pub unsafe fn create_command_buffer(connection: &mut Vk) {
 	let connection = connection.0.data();
 
 	#[repr(C)]
@@ -325,7 +323,8 @@ pub unsafe fn create_command_buffer(connection: &mut Vk)
 		&mut command_buffer).unwrap();
 
 	// Return
-	(command_buffer, command_pool)
+	connection.command_buffer = command_buffer;
+	connection.command_pool = command_pool;
 }
 
 pub unsafe fn new_sampler(connection: &mut Vk) -> VkSampler {
@@ -430,13 +429,12 @@ pub unsafe fn get_memory_type(connection: &mut Vk, mut type_bits: u32,
 }
 
 pub unsafe fn cmd_bind_descsets(connection: &mut Vk,
-	cmd_buf: VkCommandBuffer, pipeline_layout: VkPipelineLayout,
-	desc_set: VkDescriptorSet)
+	pipeline_layout: VkPipelineLayout, desc_set: VkDescriptorSet)
 {
 	let connection = connection.0.data();
 
 	(connection.bind_descsets)(
-		cmd_buf,
+		connection.command_buffer,
 		VkPipelineBindPoint::Graphics,
 		pipeline_layout,
 		0,
@@ -447,20 +445,18 @@ pub unsafe fn cmd_bind_descsets(connection: &mut Vk,
 	);
 }
 
-pub unsafe fn cmd_bind_pipeline(connection: &mut Vk,
-	cmd_buf: VkCommandBuffer, pipeline: VkPipeline)
-{
+pub unsafe fn cmd_bind_pipeline(connection: &mut Vk, pipeline: VkPipeline) {
 	let connection = connection.0.data();
 
 	(connection.bind_pipeline)(
-		cmd_buf,
+		connection.command_buffer,
 		VkPipelineBindPoint::Graphics,
 		pipeline
 	);
 }
 
 #[inline(always)] pub unsafe fn cmd_bind_vb(connection: &mut Vk,
-	cmd_buf: VkCommandBuffer, vertex_buffers: &[VkBuffer])
+	vertex_buffers: &[VkBuffer])
 {
 	let connection = connection.0.data();
 
@@ -471,7 +467,7 @@ pub unsafe fn cmd_bind_pipeline(connection: &mut Vk,
 	let length = vertex_buffers.len();
 
 	(connection.bind_vb)(
-		cmd_buf,
+		connection.command_buffer,
 		0,
 		length as u32,
 		vertex_buffers.as_ptr(),
@@ -484,14 +480,14 @@ pub unsafe fn cmd_bind_pipeline(connection: &mut Vk,
 	);
 }
 
-pub unsafe fn cmd_draw(connection: &mut Vk, cmd_buf: VkCommandBuffer,
-	nvertices: u32, ninstances: u32, firstvertex: u32, firstinstance: u32)
+pub unsafe fn cmd_draw(connection: &mut Vk, nvertices: u32, ninstances: u32,
+	firstvertex: u32, firstinstance: u32)
 {
 	let connection = connection.0.data();
 
 	assert!(nvertices > 2);
-	(connection.draw)(cmd_buf, nvertices, ninstances, firstvertex,
-		firstinstance);
+	(connection.draw)(connection.command_buffer, nvertices, ninstances,
+		firstvertex, firstinstance);
 }
 
 pub unsafe fn new_semaphore(connection: &mut Vk) -> VkSemaphore {
@@ -523,8 +519,7 @@ pub unsafe fn drop_semaphore(connection: &mut Vk, semaphore: VkSemaphore) {
 	);
 }
 
-pub unsafe fn draw_begin(connection: &mut Vk,
-	command_buffer: VkCommandBuffer, render_pass: VkRenderPass,
+pub unsafe fn draw_begin(connection: &mut Vk, render_pass: VkRenderPass,
 	image: VkImage, frame_buffer: VkFramebuffer, width: u32,
 	height: u32, r: f32, g: f32, b: f32)
 {
@@ -537,7 +532,8 @@ pub unsafe fn draw_begin(connection: &mut Vk,
 		p_inheritance_info: null(),
 	};
 
-	(connection.begin_cmdbuff)(command_buffer, &begin_info).unwrap();
+	(connection.begin_cmdbuff)(connection.command_buffer, &begin_info)
+		.unwrap();
 
 	let layout_transition_barrier = VkImageMemoryBarrier {
 		s_type: VkStructureType::ImageMemoryBarrier,
@@ -559,7 +555,7 @@ pub unsafe fn draw_begin(connection: &mut Vk,
 	};
 
 	(connection.pipeline_barrier)(
-		command_buffer,
+		connection.command_buffer,
 		VkPipelineStage::TopOfPipe, 
 		VkPipelineStage::TopOfPipeAndColorAttachmentOutput, 
 		0, 0, null(), 0, null(), 1, &layout_transition_barrier);
@@ -582,8 +578,11 @@ pub unsafe fn draw_begin(connection: &mut Vk,
 		clear_value_count: clear_value.len() as u32,
 		p_clear_values: clear_value.as_ptr(),
 	};
-	(connection.begin_render)(command_buffer, &render_pass_begin_info,
-		VkSubpassContents::Inline);
+	(connection.begin_render)(
+		connection.command_buffer,
+		&render_pass_begin_info,
+		VkSubpassContents::Inline
+	);
 
 	// take care of dynamic state:
 	let viewport = VkViewport {
@@ -594,27 +593,23 @@ pub unsafe fn draw_begin(connection: &mut Vk,
 		max_depth: 1.0,
 	};
 
-	(connection.set_viewport)(command_buffer, 0, 1, &viewport);
+	(connection.set_viewport)(connection.command_buffer, 0, 1, &viewport);
 
 	let scissor = VkRect2D {
 		offset: VkOffset2D { x: 0, y: 0 },
 		extent: VkExtent2D { width, height },
 	};
 
-	(connection.set_scissor)(command_buffer, 0, 1, &scissor);
+	(connection.set_scissor)(connection.command_buffer, 0, 1, &scissor);
 }
 
-pub unsafe fn end_render_pass(connection: &mut Vk,
-	command_buffer: VkCommandBuffer)
-{
+pub unsafe fn end_render_pass(connection: &mut Vk) {
 	let connection = connection.0.data();
 
-	(connection.end_render_pass)(command_buffer);
+	(connection.end_render_pass)(connection.command_buffer);
 }
 
-pub unsafe fn pipeline_barrier(connection: &mut Vk,
-	command_buffer: VkCommandBuffer, image: VkImage)
-{
+pub unsafe fn pipeline_barrier(connection: &mut Vk, image: VkImage) {
 	let connection = connection.0.data();
 
 	let barrier = VkImageMemoryBarrier {
@@ -637,7 +632,7 @@ pub unsafe fn pipeline_barrier(connection: &mut Vk,
 	};
 
 	(connection.pipeline_barrier)(
-		command_buffer,
+		connection.command_buffer,
 		VkPipelineStage::AllCommands, 
 		VkPipelineStage::BottomOfPipe, 
 		0, 0, null(), 0, null(), 1, &barrier);
@@ -784,13 +779,12 @@ pub unsafe fn get_present_mode(connection: &mut Vk) -> VkPresentModeKHR {
 }
 
 #[inline(always)] pub unsafe fn copy_image(connection: &mut Vk,
-	cmd_buff: VkCommandBuffer, src_image: &Image, dst_image: &Image,
-	width: u32, height: u32)
+	src_image: &Image, dst_image: &Image, width: u32, height: u32)
 {
 	let connection = connection.0.data();
 
 	(connection.copy_image)(
-		cmd_buff,
+		connection.command_buffer,
 		src_image.image().0, VkImageLayout::TransferSrcOptimal,
 		dst_image.image().0, VkImageLayout::TransferDstOptimal, 1,
 		&VkImageCopy {
@@ -919,10 +913,10 @@ pub unsafe fn create_imgview_vkimage(
 	create_imgview_vkimage(connection, image.image().0, format, has_color)
 }
 
-pub unsafe fn end_cmdbuff(connection: &mut Vk, command_buffer: VkCommandBuffer){
+pub unsafe fn end_cmdbuff(connection: &mut Vk) {
 	let connection = connection.0.data();
 
-	(connection.end_cmdbuff)(command_buffer).unwrap();
+	(connection.end_cmdbuff)(connection.command_buffer).unwrap();
 }
 
 pub unsafe fn create_fence(connection: &mut Vk) -> VkFence {
@@ -952,8 +946,7 @@ pub unsafe fn fence_drop(connection: &mut Vk, fence: VkFence) {
 	);
 }
 
-pub unsafe fn queue_submit(connection: &mut Vk,
-	command_buffer: VkCommandBuffer, submit_fence: VkFence,
+pub unsafe fn queue_submit(connection: &mut Vk, submit_fence: VkFence,
 	pipelane_stage: VkPipelineStage, queue: VkQueue,
 	semaphore: Option<VkSemaphore>)
 {
@@ -969,7 +962,7 @@ pub unsafe fn queue_submit(connection: &mut Vk,
 			wait_semaphores: null(),
 			wait_dst_stage_mask: &pipelane_stage,
 			command_buffer_count: 1,
-			p_command_buffers: &command_buffer,
+			p_command_buffers: &connection.command_buffer,
 			signal_semaphore_count: if semaphore.is_none() { 0 }
 				else { 1 },
 			p_signal_semaphores: if let Some(ref sem) = semaphore {
@@ -993,7 +986,7 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 	vulkan: &mut Vk, color_format: &VkFormat,
 	submit_fence: &mut VkFence, image_count: u32,
 	swap_images: &mut [VkImage; 2], image_views: &mut [VkImageView; 2],
-	command_buffer: VkCommandBuffer, present_queue: VkQueue)
+	present_queue: VkQueue)
 {
 //	let connection = vulkan.0.data();
 
@@ -1001,7 +994,7 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 
 	for i in 0..(image_count as usize) {
 		(vulkan.0.data().begin_cmdbuff)(
-			command_buffer,
+			vulkan.0.data().command_buffer,
 			&VkCommandBufferBeginInfo {
 				s_type: VkStructureType::CommandBufferBeginInfo,
 				p_next: null(),
@@ -1011,7 +1004,7 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 		).unwrap();
 
 		(vulkan.0.data().pipeline_barrier)(
-			command_buffer,
+			vulkan.0.data().command_buffer,
 			VkPipelineStage::TopOfPipe, 
 			VkPipelineStage::TopOfPipe,
 			0, 0, null(), 0, null(), 1,
@@ -1035,14 +1028,14 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 			}
 		);
 
-		end_cmdbuff(vulkan, command_buffer);
-		queue_submit(vulkan, command_buffer, *submit_fence,
+		end_cmdbuff(vulkan);
+		queue_submit(vulkan, *submit_fence,
 			VkPipelineStage::ColorAttachmentOutput, present_queue,
 			None);
 		wait_fence(vulkan, *submit_fence);
 
 		(vulkan.0.data().reset_fence)(vulkan.0.data().device, 1, submit_fence).unwrap();
-		(vulkan.0.data().reset_cmdbuff)(command_buffer, 0);
+		(vulkan.0.data().reset_cmdbuff)(vulkan.0.data().command_buffer, 0);
 
 		image_views[i] = create_imgview_vkimage(vulkan, swap_images[i],
 			color_format.clone(), true);
@@ -1067,9 +1060,8 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 
 // TODO: in depth_buffer.rs
 #[inline(always)] pub unsafe fn create_depth_buffer(
-	vulkan: &mut Vk, command_buffer: VkCommandBuffer, submit_fence: VkFence,
-	present_queue: VkQueue, width: u32, height: u32)
-	-> (Image, VkImageView)
+	vulkan: &mut Vk, submit_fence: VkFence, present_queue: VkQueue,
+	width: u32, height: u32) -> (Image, VkImageView)
 {
 //	let connection = vulkan.0.data();
 
@@ -1079,7 +1071,7 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 
 	// before using this depth buffer we must change it's layout:
 	(vulkan.0.data().begin_cmdbuff)(
-		command_buffer,
+		vulkan.0.data().command_buffer,
 		&VkCommandBufferBeginInfo {
 			s_type: VkStructureType::CommandBufferBeginInfo,
 			p_next: null(),
@@ -1089,7 +1081,7 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 	).unwrap();
 
 	(vulkan.0.data().pipeline_barrier)(
-		command_buffer, 
+		vulkan.0.data().command_buffer, 
 		VkPipelineStage::TopOfPipe, 
 		VkPipelineStage::TopOfPipeAndEarlyFragmentTests,
 		0,
@@ -1120,14 +1112,14 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 		}
 	);
 
-	end_cmdbuff(vulkan, command_buffer);
-	queue_submit(vulkan, command_buffer, submit_fence,
+	end_cmdbuff(vulkan);
+	queue_submit(vulkan, submit_fence,
 		VkPipelineStage::ColorAttachmentOutput, present_queue, None);
 	wait_fence(vulkan, submit_fence);
 
 	(vulkan.0.data().reset_fence)(vulkan.0.data().device, 1, &submit_fence)
 		.unwrap();
-	(vulkan.0.data().reset_cmdbuff)(command_buffer, 0);
+	(vulkan.0.data().reset_cmdbuff)(vulkan.0.data().command_buffer, 0);
 
 	// create the depth image view:
 	let image_view = create_imgview(vulkan, &image, VkFormat::D16Unorm,

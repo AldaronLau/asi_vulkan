@@ -166,6 +166,8 @@ pub struct Vulkan {
 	pub(crate) pqi: u32,
 	pub(crate) sampled: bool,
 	pub(crate) device: VkDevice,
+	pub(crate) command_buffer: VkCommandBuffer,
+	pub(crate) command_pool: u64,
 	pub(crate) lib: *mut c_void,
 	pub(crate) vksym: unsafe extern "system" fn(VkInstance, *const i8) -> *mut c_void,
 	pub(crate) vkdsym: unsafe extern "system" fn(VkDevice, *const i8) -> *mut c_void,
@@ -324,6 +326,8 @@ impl Vulkan {
 			pqi: ::std::mem::uninitialized(),
 			sampled: ::std::mem::uninitialized(),
 			device: ::std::mem::uninitialized(),
+			command_buffer: ::std::mem::uninitialized(),
+			command_pool: ::std::mem::uninitialized(),
 			vkdsym: vk_sym(vk, vksym, b"vkGetDeviceProcAddr\0"),
 			mapmem: vk_sym(vk, vksym, b"vkMapMemory\0"),
 			draw: vk_sym(vk, vksym, b"vkCmdDraw\0"),
@@ -447,6 +451,16 @@ impl Vk {
 
 impl Drop for Vulkan {
 	fn drop(&mut self) -> () {
+		// Load Function (Command Buffer & Command Pool)
+		type VkDestroyCommandPool = unsafe extern "system" fn(
+			VkDevice, u64, *const c_void) -> ();
+		let destroy: VkDestroyCommandPool = unsafe {
+			sym(self, b"vkDestroyCommandPool\0")
+		};
+
+		// Run Function (Command Buffer & Command Pool)
+		unsafe { destroy(self.device, self.command_pool, null()) };
+
 		// Load Function (Surface)
 		type VkDestroySurface = unsafe extern "system" fn(
 			instance: VkInstance, surface: VkSurfaceKHR,
