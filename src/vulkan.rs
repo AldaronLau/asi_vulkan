@@ -90,10 +90,8 @@ pub(crate) unsafe fn sym<T>(connection: &Vulkan, name: &[u8]) -> T {
 	vk_sym(connection.vk, connection.vksym, name)
 }
 
-pub(crate) unsafe fn dsym<T>(connection: &Vulkan, device: VkDevice,
-	name: &[u8]) -> T
-{
-	vkd_sym(device, connection.vkdsym, name)
+pub(crate) unsafe fn dsym<T>(connection: &Vulkan, name: &[u8]) -> T {
+	vkd_sym(connection.device, connection.vkdsym, name)
 }
 
 unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
@@ -163,6 +161,11 @@ unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
 /// The Vulkan context.
 pub struct Vulkan {
 	pub(crate) vk: VkInstance,
+	pub(crate) surface: VkSurfaceKHR,
+	pub(crate) gpu: VkPhysicalDevice,
+	pub(crate) pqi: u32,
+	pub(crate) sampled: bool,
+	pub(crate) device: VkDevice,
 	pub(crate) lib: *mut c_void,
 	pub(crate) vksym: unsafe extern "system" fn(VkInstance, *const i8) -> *mut c_void,
 	pub(crate) vkdsym: unsafe extern "system" fn(VkDevice, *const i8) -> *mut c_void,
@@ -223,6 +226,8 @@ pub struct Vulkan {
 		*const c_void) -> (),
 	pub(crate) drop_image: unsafe extern "system" fn(VkDevice, VkImage, *const c_void)
 		-> (),
+	pub(crate) drop_memory: unsafe extern "system" fn(VkDevice,
+		VkDeviceMemory, *const c_void) -> (),
 	pub(crate) drop_swapchain: unsafe extern "system" fn(VkDevice, VkSwapchainKHR,
 		*const c_void) -> (),
 	pub(crate) update_descsets: unsafe extern "system" fn(VkDevice, u32,
@@ -313,6 +318,12 @@ impl Vulkan {
 
 		Some(Vulkan {
 			vk, lib, vksym,
+			// Late inits.
+			surface: ::std::mem::uninitialized(),
+			gpu: ::std::mem::uninitialized(),
+			pqi: ::std::mem::uninitialized(),
+			sampled: ::std::mem::uninitialized(),
+			device: ::std::mem::uninitialized(),
 			vkdsym: vk_sym(vk, vksym, b"vkGetDeviceProcAddr\0"),
 			mapmem: vk_sym(vk, vksym, b"vkMapMemory\0"),
 			draw: vk_sym(vk, vksym, b"vkCmdDraw\0"),
@@ -341,6 +352,7 @@ impl Vulkan {
 			drop_imgview: vk_sym(vk, vksym, b"vkDestroyImageView\0"),
 			drop_renderpass: vk_sym(vk, vksym, b"vkDestroyRenderPass\0"),
 			drop_image: vk_sym(vk, vksym, b"vkDestroyImage\0"),
+			drop_memory: vk_sym(vk, vksym, b"vkFreeMemory\0\0"),
 			drop_swapchain: vk_sym(vk, vksym, b"vkDestroySwapchainKHR\0"),
 			update_descsets: vk_sym(vk, vksym, b"vkUpdateDescriptorSets\0"),
 			drop_descsets: vk_sym(vk, vksym, b"vkFreeDescriptorSets\0"),
@@ -384,22 +396,21 @@ impl Vulkan {
 }
 
 pub enum VkType {
-	Surface,
+	Image,
 }
 
 pub struct VkObject {
 	vk_type: VkType,
 	value_a: u64,
+	value_b: u64,
 }
 
 impl VkObject {
-	pub fn new(vk_type: VkType, value_a: u64) -> Self {
-		VkObject { vk_type, value_a }
+	pub fn new(vk_type: VkType, value_a: u64, value_b: u64) -> Self {
+		VkObject { vk_type, value_a, value_b }
 	}
 
-	pub fn surface(&self) -> VkSurfaceKHR {
-		self.value_a
-	}
+	pub fn image(&self) -> (u64, u64) { (self.value_a, self.value_b) }
 }
 
 impl ::ami::PseudoDrop for VkObject {
@@ -409,7 +420,7 @@ impl ::ami::PseudoDrop for VkObject {
 		use VkType::*;
 
 		match self.vk_type {
-			Surface => ::surface::destroy(self.surface(), vulkan),
+			Image => ::image::destroy(self.image(), vulkan),
 		}
 	}
 }
@@ -427,10 +438,26 @@ impl Vk {
 	pub fn as_ptr(&mut self) -> *mut Vulkan {
 		self.0.data()
 	}
+
+	/// Whether or not images are sampled.
+	pub fn sampled(&self) -> bool {
+		self.0.data().sampled
+	}
 }
 
 impl Drop for Vulkan {
 	fn drop(&mut self) -> () {
+		// Load Function (Surface)
+		type VkDestroySurface = unsafe extern "system" fn(
+			instance: VkInstance, surface: VkSurfaceKHR,
+			pAllocator: *mut c_void) -> ();
+		let destroy: VkDestroySurface = unsafe {
+			sym(self, b"vkDestroySurfaceKHR\0")
+		};
+
+		// Run Function (Surface)
+		unsafe { destroy(self.vk, self.surface, null_mut()) };
+
 		// Load Function
 		type VkDestroyInstance = unsafe extern "system" fn(
 			instance: VkInstance, pAllocator: *mut c_void) -> ();

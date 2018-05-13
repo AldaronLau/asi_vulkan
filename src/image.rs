@@ -6,49 +6,38 @@
 
 use std::mem;
 use std::ptr::{ null };
-use libc::c_void;
+use ami::Child;
 
+use VkObject;
+use VkType;
+use Vulkan;
 use Vk;
-use vulkan;
 use types::*;
 use get_memory_type;
 
 /// An Image
-pub struct Image {
-	pub image: VkImage,
-	pub image_memory: VkDeviceMemory,
-	#[allow(unused)] // TODO
-	device: VkDevice,
-	#[allow(unused)] // TODO
-	drop_image: unsafe extern "system" fn(VkDevice, VkImage, *const c_void)
-		-> (),
-	#[allow(unused)] // TODO
-	drop_memory: unsafe extern "system" fn(VkDevice, VkDeviceMemory,
-		*const c_void) -> (),
-}
+pub struct Image(pub(crate)Child<Vulkan, VkObject>);
 
 impl Image {
 	/// Create a new image.
-	#[inline(always)] pub fn new(vulkan: &mut Vk, device: VkDevice,
-		gpu: VkPhysicalDevice, width: u32, height: u32,
+	#[inline(always)] pub fn new(vulkan: &mut Vk, width: u32, height: u32,
 		format: VkFormat, tiling: VkImageTiling, usage: VkImageUsage,
 		initial_layout: VkImageLayout, reqs_mask: VkFlags,
 		samples: VkSampleCount) -> Image
 	{ unsafe {
 //		let c = vulkan.0.data();
 
-		let drop_image
-			= vulkan::dsym(vulkan.0.data(), device, b"vkDestroyImage\0");
-		let drop_memory =
-			vulkan::dsym(vulkan.0.data(), device, b"vkFreeMemory\0");
+//		let drop_image
+//			= vulkan::dsym(vulkan.0.data(), device, b"vkDestroyImage\0");
+//		let drop_memory =
+//			vulkan::dsym(vulkan.0.data(), device, b"vkFreeMemory\0");
 
 		let mut image = mem::uninitialized();
 		let mut image_memory = mem::uninitialized();
-
 		let mut memory_reqs = mem::uninitialized();
 
 		(vulkan.0.data().create_image)(
-			device,
+			vulkan.0.data().device,
 			&VkImageCreateInfo {
 				s_type: VkStructureType::ImageCreateInfo,
 				p_next: null(),
@@ -74,17 +63,17 @@ impl Image {
 			&mut image
 		).unwrap();
 
-		(vulkan.0.data().get_imgmemreq)(device, image, &mut memory_reqs);
+		(vulkan.0.data().get_imgmemreq)(vulkan.0.data().device, image,
+			&mut memory_reqs);
 
 		(vulkan.0.data().mem_allocate)(
-			device,
+			vulkan.0.data().device,
 			&VkMemoryAllocateInfo {
 				s_type: VkStructureType::MemoryAllocateInfo,
 				next: null(),
 				allocation_size: memory_reqs.size,
 				memory_type_index: get_memory_type(
 					vulkan,
-					gpu,
 					memory_reqs.memory_type_bits,
 					reqs_mask
 				),
@@ -93,22 +82,29 @@ impl Image {
 			&mut image_memory
 		).unwrap();
 
-		(vulkan.0.data().bind_imgmem)(device, image, image_memory, 0)
-			.unwrap();
+		(vulkan.0.data().bind_imgmem)(vulkan.0.data().device, image,
+			image_memory, 0).unwrap();
 
-		Image { image, image_memory, device, drop_image, drop_memory }
+		Image(Child::new(&vulkan.0,
+			VkObject::new(VkType::Image, image, image_memory)))
 	} }
+
+	pub (crate) fn image(&self) -> (u64, u64) {
+		self.0.data().image()
+	}
+
+	/// Get the memory handle for this image.
+	pub fn memory(&self) -> u64 {
+		self.image().1
+	}
 }
 
-impl Drop for Image {
-	#[inline(always)]
-	fn drop(&mut self) {
-		// TODO: image & image_memory are being moved, dropping the
-		// Image - causing them to be invalid
-//		unsafe {
-//			(self.drop_image)(self.device, self.image, null());
-//			(self.drop_memory)(self.device, self.image_memory,
-//				null());
-//		}
+#[inline(always)] pub(crate) fn destroy(image: (u64, u64), c: &mut Vulkan) {
+	// Run Drop Function
+	unsafe {
+		(c.drop_image)(c.device, image.0, null());
+		(c.drop_memory)(c.device, image.1, null());
 	}
+
+	println!("TEST: Drop Image");
 }

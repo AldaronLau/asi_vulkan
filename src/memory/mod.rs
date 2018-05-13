@@ -30,25 +30,23 @@ pub struct Memory<T> where T: Clone {
 impl<T> Memory<T> where T: Clone {
 	/// Allocate memory in a GPU buffer.
 	#[inline(always)]
-	pub fn new(vulkan: &mut Vk, device: VkDevice,
-		gpu: VkPhysicalDevice, data: T) -> Memory<T>
-	{
+	pub fn new(vulkan: &mut Vk, data: T) -> Memory<T> {
 //		let c = vulkan.0.data();
 
-		let buffer = buffer::Buffer::new(vulkan.0.data(), device, mem::size_of::<T>(),
+		let buffer = buffer::Buffer::new(vulkan.0.data(),
+			mem::size_of::<T>(),
 			buffer::BufferBuilderType::Uniform);
 		let mut memory = unsafe { mem::uninitialized() };
-		let mem_reqs = buffer.get_reqs(vulkan.0.data(), device);
+		let mem_reqs = buffer.get_reqs(vulkan.0.data());
 		unsafe {
 			(vulkan.0.data().mem_allocate)(
-				device,
+				vulkan.0.data().device,
 				&VkMemoryAllocateInfo {
 					s_type: VkStructureType::MemoryAllocateInfo,
 					next: ptr::null(),
 					allocation_size: mem_reqs.size,
 					memory_type_index: super::get_memory_type(
 						vulkan,
-						gpu,
 						mem_reqs.memory_type_bits,
 						VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
 						VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
@@ -58,13 +56,19 @@ impl<T> Memory<T> where T: Clone {
 			).unwrap();
 		}
 		let dropfn = unsafe {
-			vulkan::dsym(vulkan.0.data(), device, b"vkFreeMemory\0")
+			vulkan::dsym(vulkan.0.data(), b"vkFreeMemory\0")
 		};
 
 		unsafe {
-			(vulkan.0.data().bind_buffer_mem)(device, buffer.buffer, memory, 0)
-				.unwrap();
+			(vulkan.0.data().bind_buffer_mem)(
+				vulkan.0.data().device,
+				buffer.buffer,
+				memory,
+				0
+			).unwrap();
 		}
+
+		let device = vulkan.0.data().device;
 
 		let memory = Memory { data, memory, buffer, device, dropfn };
 

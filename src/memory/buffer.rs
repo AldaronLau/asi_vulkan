@@ -26,13 +26,11 @@ pub struct Buffer {
 impl Buffer {
 	/// Create a new buffer on the GPU.
 	#[inline(always)]
-	pub fn new(c: &Vulkan, device: VkDevice, nbytes: usize,
-		bbt: BufferBuilderType) -> Buffer
-	{
+	pub fn new(c: &Vulkan, nbytes: usize, bbt: BufferBuilderType) -> Buffer{
 		let mut buffer = unsafe { mem::uninitialized() };
 		unsafe {
 			(c.new_buffer)(
-				device,
+				c.device,
 				&VkBufferCreateInfo {
 					s_type: VkStructureType::BufferCreateInfo,
 					next: ptr::null(),
@@ -53,20 +51,18 @@ impl Buffer {
 			).unwrap();
 		}
 		let dropfn = unsafe {
-			vulkan::dsym(c, device, b"vkDestroyBuffer\0")
+			vulkan::dsym(c, b"vkDestroyBuffer\0")
 		};
 		Buffer { buffer, dropfn }
 	}
 
 	/// Get Memory Requirements.
 	#[inline(always)]
-	pub fn get_reqs(&self, connection: &Vulkan, device: VkDevice)
-		-> VkMemoryRequirements
-	{
+	pub fn get_reqs(&self, connection: &Vulkan) -> VkMemoryRequirements {
 		let mut mem_reqs = unsafe { mem::uninitialized() };
 		unsafe {
 			(connection.get_bufmemreq)(
-				device,
+				connection.device,
 				self.buffer,
 				&mut mem_reqs
 			);

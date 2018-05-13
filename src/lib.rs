@@ -27,7 +27,7 @@ use libc::c_void;
 pub use self::memory::Memory;
 pub use self::depth_buffer::DepthBuffer;
 pub use self::image::Image;
-pub use self::surface::Surface;
+pub use self::surface::{ new_surface_xcb, new_surface_windows };
 pub use self::vulkan::Vk;
 
 //
@@ -68,9 +68,7 @@ pub struct VwInstance {
 	pub pipeline: Style,
 }
 
-pub unsafe fn get_gpu(connection: &mut Vk, surface: &Surface)
-	-> (VkPhysicalDevice, u32, bool)
-{
+pub unsafe fn get_gpu(connection: &mut Vk) -> Result<(), &'static str> {
 	let connection = connection.0.data();
 
 	#[repr(C)]
@@ -129,7 +127,7 @@ pub unsafe fn get_gpu(connection: &mut Vk, surface: &Surface)
 			let k = j as u32;
 			let mut supports_present = 0;
 
-			vk_get_support(gpus[i], k, surface.surface(),
+			vk_get_support(gpus[i], k, connection.surface,
 				&mut supports_present).unwrap();
 
 			if supports_present != 0 &&
@@ -141,19 +139,19 @@ pub unsafe fn get_gpu(connection: &mut Vk, surface: &Surface)
 				(connection.gpu_props)(gpus[i],
 					VkFormat::R8g8b8a8Unorm, &mut props);
 
-				return (gpus[i], k,
-					props.linear_tiling_features &
-					0x00000001 /* sampled image bit */ != 0);
+				connection.gpu = gpus[i];
+				connection.pqi = k;
+				connection.sampled=props.linear_tiling_features
+					& 0x00000001 /* sampled image */ != 0;
+				return Ok(());
 			}
 		}
 	}
 
-	panic!("Couldn't Create Gpu.");
+	Err("Couldn't Create Gpu.")
 }
 
-pub unsafe fn create_device(connection: &mut Vk, gpu: VkPhysicalDevice,
-	pqi: u32) -> VkDevice
-{
+pub unsafe fn create_device(connection: &mut Vk) {
 	let connection = connection.0.data();
 
 	#[derive(Debug)] #[repr(C)]
@@ -189,10 +187,9 @@ pub unsafe fn create_device(connection: &mut Vk, gpu: VkPhysicalDevice,
 	let vk_create_device: VkCreateDevice = vulkan::sym(connection,
 		b"vkCreateDevice\0");
 
-	let mut device = mem::uninitialized();
 	let ext = b"VK_KHR_swapchain\0";
 
-	vk_create_device(gpu, &VkDeviceCreateInfo {
+	vk_create_device(connection.gpu, &VkDeviceCreateInfo {
 		s_type: VkStructureType::DeviceCreateInfo,
 		p_next: null_mut(),
 		flags: 0,
@@ -201,7 +198,7 @@ pub unsafe fn create_device(connection: &mut Vk, gpu: VkPhysicalDevice,
 			s_type: VkStructureType::DeviceQueueCreateInfo,
 			p_next: null_mut(),
 			flags: 0,
-			queue_family_index: pqi,
+			queue_family_index: connection.pqi,
 			queue_count: 1,
 			p_queue_priorities: &1.0,
 		}].as_ptr(),
@@ -210,14 +207,10 @@ pub unsafe fn create_device(connection: &mut Vk, gpu: VkPhysicalDevice,
 		enabled_extension_count: 1,
 		enabled_extension_names: [ext.as_ptr()].as_ptr(),
 		enabled_features: null_mut(),
-	}, null_mut(), &mut device).unwrap();
-
-	device
+	}, null_mut(), &mut connection.device).unwrap();
 }
 
-pub unsafe fn create_queue(connection: &mut Vk, device: VkDevice, pqi: u32)
-	-> VkQueue
-{
+pub unsafe fn create_queue(connection: &mut Vk) -> VkQueue {
 	let connection = connection.0.data();
 
 	// Load function
@@ -225,13 +218,13 @@ pub unsafe fn create_queue(connection: &mut Vk, device: VkDevice, pqi: u32)
 		queueFamilyIndex: u32, queueIndex: u32, pQueue: *mut VkQueue)
 		-> ();
 	let vk_get_device_queue: VkGetDeviceQueue = vulkan::dsym(connection,
-		device, b"vkGetDeviceQueue\0");
+		b"vkGetDeviceQueue\0");
 
 	// Set Data
 	let mut queue = mem::uninitialized();
 
 	// Run Function
-	vk_get_device_queue(device, pqi, 0, &mut queue);
+	vk_get_device_queue(connection.device, connection.pqi, 0, &mut queue);
 
 	// Return
 	queue
@@ -256,14 +249,14 @@ pub unsafe fn queue_present(connection: &mut Vk, queue: VkQueue,
 	(connection.queue_present)(queue, &present_info).unwrap()
 }
 
-pub unsafe fn wait_idle(connection: &mut Vk, device: VkDevice) {
+pub unsafe fn wait_idle(connection: &mut Vk) {
 	let connection = connection.0.data();
 
-	(connection.wait_idle)(device).unwrap();
+	(connection.wait_idle)(connection.device).unwrap();
 }
 
-pub unsafe fn create_command_buffer(connection: &mut Vk, device: VkDevice,
-	pqi: u32) -> (VkCommandBuffer, u64)
+pub unsafe fn create_command_buffer(connection: &mut Vk)
+	-> (VkCommandBuffer, u64)
 {
 	let connection = connection.0.data();
 
@@ -294,7 +287,7 @@ pub unsafe fn create_command_buffer(connection: &mut Vk, device: VkDevice,
 		pCreateInfo: *const VkCommandPoolCreateInfo,
 		pAllocator: *mut c_void, pCommandPool: *mut u64) -> VkResult;
 	let vk_create_command_pool: VkCreateCommandPool = vulkan::dsym(
-		connection, device, b"vkCreateCommandPool\0");
+		connection, b"vkCreateCommandPool\0");
 
 	// Set Data
 	let mut command_pool = 0;
@@ -304,11 +297,11 @@ pub unsafe fn create_command_buffer(connection: &mut Vk, device: VkDevice,
 		s_type: VkStructureType::CommandPoolCreateInfo,
 		p_next: null_mut(),
 		flags: 0x00000002, // Reset Command Buffer
-		queue_family_index: pqi,
+		queue_family_index: connection.pqi,
 	};
 
 	// Run Function
-	vk_create_command_pool(device, &create_info, null_mut(),
+	vk_create_command_pool(connection.device, &create_info, null_mut(),
 		&mut command_pool).unwrap();
 
 	// Load Function
@@ -316,7 +309,7 @@ pub unsafe fn create_command_buffer(connection: &mut Vk, device: VkDevice,
 		ai: *const VkCommandBufferAllocateInfo,
 		cmd_buffs: *mut VkCommandBuffer) -> VkResult;
 	let vk_allocate_command_buffers: VkAllocateCommandBuffers =
-		vulkan::dsym(connection, device, b"vkAllocateCommandBuffers\0");
+		vulkan::dsym(connection, b"vkAllocateCommandBuffers\0");
 
 	// Set Data
 	let allocate_info = VkCommandBufferAllocateInfo {
@@ -328,22 +321,20 @@ pub unsafe fn create_command_buffer(connection: &mut Vk, device: VkDevice,
 	};
 
 	// Run Function
-	vk_allocate_command_buffers(device, &allocate_info,
+	vk_allocate_command_buffers(connection.device, &allocate_info,
 		&mut command_buffer).unwrap();
 
 	// Return
 	(command_buffer, command_pool)
 }
 
-pub unsafe fn new_sampler(connection: &mut Vk, device: VkDevice)
-	-> VkSampler
-{
+pub unsafe fn new_sampler(connection: &mut Vk) -> VkSampler {
 	let connection = connection.0.data();
 
 	let mut sampler = mem::uninitialized();
 
 	(connection.new_sampler)(
-		device,
+		connection.device,
 		&VkSamplerCreateInfo {
 			s_type: VkStructureType::SamplerCreateInfo,
 			next: null(),
@@ -371,16 +362,16 @@ pub unsafe fn new_sampler(connection: &mut Vk, device: VkDevice)
 	sampler
 }
 
-pub unsafe fn subres_layout(connection: &mut Vk, device: VkDevice,
-	image: VkImage) -> VkSubresourceLayout
+pub unsafe fn subres_layout(connection: &mut Vk, image: &Image)
+	-> VkSubresourceLayout
 {
 	let connection = connection.0.data();
 
 	let mut layout = mem::uninitialized();
 
 	(connection.subres_layout)(
-		device,
-		image,
+		connection.device,
+		image.image().0,
 		&VkImageSubresource {
 			aspect_mask: VkImageAspectFlags::Color,
 			mip_level: 0,
@@ -392,36 +383,34 @@ pub unsafe fn subres_layout(connection: &mut Vk, device: VkDevice,
 	layout
 }
 
-pub unsafe fn map_memory<T>(connection: &mut Vk, device: VkDevice,
-	vb_memory: VkDeviceMemory, size: u64) -> *mut T
-	where T: Clone
+pub unsafe fn map_memory<T>(connection: &mut Vk, vb_memory: VkDeviceMemory,
+	size: u64) -> *mut T
+		where T: Clone
 {
 	let connection = connection.0.data();
 
 	let mut mapped = mem::uninitialized();
 
-	(connection.mapmem)(device, vb_memory, 0, size, 0,
+	(connection.mapmem)(connection.device, vb_memory, 0, size, 0,
 		&mut mapped as *mut *mut _ as *mut *mut c_void).unwrap();
 
 	mapped
 }
 
-pub unsafe fn unmap_memory(connection: &mut Vk, device: VkDevice,
-	vb_memory: VkDeviceMemory) -> ()
-{
+pub unsafe fn unmap_memory(connection: &mut Vk, vb_memory: VkDeviceMemory) {
 	let connection = connection.0.data();
 
-	(connection.unmap)(device, vb_memory);
+	(connection.unmap)(connection.device, vb_memory);
 }
 
-pub unsafe fn get_memory_type(connection: &mut Vk, gpu: VkPhysicalDevice,
-	mut type_bits: u32, reqs_mask: VkFlags) -> u32
+pub unsafe fn get_memory_type(connection: &mut Vk, mut type_bits: u32,
+	reqs_mask: VkFlags) -> u32
 {
 	let connection = connection.0.data();
 
 	let mut props = mem::uninitialized();
 	// TODO; only needs to happen once
-	(connection.get_memprops)(gpu, &mut props);
+	(connection.get_memprops)(connection.gpu, &mut props);
 
 	for i in 0..(props.memory_type_count as usize) {
 		// Memory type req's matches vkGetImageMemoryRequirements()?
@@ -505,15 +494,13 @@ pub unsafe fn cmd_draw(connection: &mut Vk, cmd_buf: VkCommandBuffer,
 		firstinstance);
 }
 
-pub unsafe fn new_semaphore(connection: &mut Vk, device: VkDevice)
-	-> VkSemaphore
-{
+pub unsafe fn new_semaphore(connection: &mut Vk) -> VkSemaphore {
 	let connection = connection.0.data();
 
 	let mut semaphore = mem::uninitialized();
 
 	(connection.new_semaphore)(
-		device,
+		connection.device,
 		&VkSemaphoreCreateInfo {
 			s_type: VkStructureType::SemaphoreCreateInfo,
 			next: null(),
@@ -526,13 +513,11 @@ pub unsafe fn new_semaphore(connection: &mut Vk, device: VkDevice)
 	semaphore
 }
 
-pub unsafe fn drop_semaphore(connection: &mut Vk, device: VkDevice,
-	semaphore: VkSemaphore) -> ()
-{
+pub unsafe fn drop_semaphore(connection: &mut Vk, semaphore: VkSemaphore) {
 	let connection = connection.0.data();
 
 	(connection.drop_semaphore)(
-		device,
+		connection.device,
 		semaphore,
 		null(),
 	);
@@ -658,7 +643,7 @@ pub unsafe fn pipeline_barrier(connection: &mut Vk,
 		0, 0, null(), 0, null(), 1, &barrier);
 }
 
-pub unsafe fn get_next_image(vulkan: &mut Vk, device: VkDevice,
+pub unsafe fn get_next_image(vulkan: &mut Vk,
 	presenting_complete_sem: &mut VkSemaphore, swapchain: VkSwapchainKHR)
 	-> u32
 {
@@ -667,7 +652,7 @@ pub unsafe fn get_next_image(vulkan: &mut Vk, device: VkDevice,
 	let mut image_id = mem::uninitialized();
 
 	let mut result = (vulkan.0.data().get_next_image)(
-		device,
+		vulkan.0.data().device,
 		swapchain,
 		u64::MAX,
 		*presenting_complete_sem,
@@ -678,11 +663,11 @@ pub unsafe fn get_next_image(vulkan: &mut Vk, device: VkDevice,
 	while result == VkResult::OutOfDateKhr {
 		println!("OUt OF DAte");
 
-		drop_semaphore(vulkan, device, *presenting_complete_sem);
-		*presenting_complete_sem = new_semaphore(vulkan, device);
+		drop_semaphore(vulkan, *presenting_complete_sem);
+		*presenting_complete_sem = new_semaphore(vulkan);
 
 		result = (vulkan.0.data().get_next_image)(
-			device,
+			vulkan.0.data().device,
 			swapchain,
 			u64::MAX,
 			*presenting_complete_sem,
@@ -698,9 +683,7 @@ pub unsafe fn get_next_image(vulkan: &mut Vk, device: VkDevice,
 	image_id
 }
 
-pub unsafe fn get_color_format(connection: &mut Vk, gpu: VkPhysicalDevice,
-	surface: &Surface) -> VkFormat
-{
+pub unsafe fn get_color_format(connection: &mut Vk) -> VkFormat {
 	let connection = connection.0.data();
 
 	// Load Function
@@ -716,8 +699,8 @@ pub unsafe fn get_color_format(connection: &mut Vk, gpu: VkPhysicalDevice,
 	let mut format = mem::uninitialized();
 
 	// Run Function
-	get_gpu_surface_formats(gpu, surface.surface(), &mut nformats,
-		&mut format).unwrap();
+	get_gpu_surface_formats(connection.gpu, connection.surface,
+		&mut nformats, &mut format).unwrap();
 
 	// Process data
 	if format.format == VkFormat::Undefined {
@@ -727,17 +710,15 @@ pub unsafe fn get_color_format(connection: &mut Vk, gpu: VkPhysicalDevice,
 	}
 }
 
-pub unsafe fn get_buffering(connection: &mut Vk, gpu: VkPhysicalDevice,
-	surface: &Surface) -> u32
-{
+pub unsafe fn get_buffering(connection: &mut Vk) -> u32 {
 	let connection = connection.0.data();
 
 	// Set Data
 	let mut surface_info = mem::uninitialized();
 
 	// Run Function
-	(connection.get_surface_capabilities)(gpu, surface.surface(),
-		&mut surface_info).unwrap();
+	(connection.get_surface_capabilities)(connection.gpu,
+		connection.surface, &mut surface_info).unwrap();
 
 	// Process data
 	let min = surface_info.min_image_count;
@@ -766,9 +747,7 @@ pub unsafe fn get_buffering(connection: &mut Vk, gpu: VkPhysicalDevice,
 	image_count
 }
 
-pub unsafe fn get_present_mode(connection: &mut Vk, gpu: VkPhysicalDevice,
-	surface: &Surface) -> VkPresentModeKHR
-{
+pub unsafe fn get_present_mode(connection: &mut Vk) -> VkPresentModeKHR {
 	let connection = connection.0.data();
 
 	// Load Function
@@ -781,7 +760,7 @@ pub unsafe fn get_present_mode(connection: &mut Vk, gpu: VkPhysicalDevice,
 	let mut npresentmodes = mem::uninitialized();
 
 	// Run Function
-	vk_get_present_modes(gpu, surface.surface(), &mut npresentmodes,
+	vk_get_present_modes(connection.gpu, connection.surface, &mut npresentmodes,
 		null_mut()).unwrap();
 
 	// Set Data
@@ -790,7 +769,7 @@ pub unsafe fn get_present_mode(connection: &mut Vk, gpu: VkPhysicalDevice,
 		npresentmodes_usize];
 
 	// Run Function
-	vk_get_present_modes(gpu, surface.surface(),
+	vk_get_present_modes(connection.gpu, connection.surface,
 		&mut npresentmodes, present_modes.as_mut_ptr()).unwrap();
 
 	// Process Data
@@ -805,14 +784,15 @@ pub unsafe fn get_present_mode(connection: &mut Vk, gpu: VkPhysicalDevice,
 }
 
 #[inline(always)] pub unsafe fn copy_image(connection: &mut Vk,
-	cmd_buff: VkCommandBuffer, src_image: VkImage, dst_image: VkImage,
+	cmd_buff: VkCommandBuffer, src_image: &Image, dst_image: &Image,
 	width: u32, height: u32)
 {
 	let connection = connection.0.data();
 
 	(connection.copy_image)(
-		cmd_buff, src_image, VkImageLayout::TransferSrcOptimal,
-		dst_image, VkImageLayout::TransferDstOptimal, 1,
+		cmd_buff,
+		src_image.image().0, VkImageLayout::TransferSrcOptimal,
+		dst_image.image().0, VkImageLayout::TransferDstOptimal, 1,
 		&VkImageCopy {
 			src_subresource: VkImageSubresourceLayers {
 				aspect_mask: VkImageAspectFlags::Color,
@@ -834,20 +814,19 @@ pub unsafe fn get_present_mode(connection: &mut Vk, gpu: VkPhysicalDevice,
 }
 
 #[inline(always)] pub unsafe fn create_swapchain(
-	connection: &mut Vk, surface: &Surface, gpu: VkPhysicalDevice,
-	device: VkDevice, swapchain: &mut VkSwapchainKHR, width: u32,
+	connection: &mut Vk, swapchain: &mut VkSwapchainKHR, width: u32,
 	height: u32, image_count: &mut u32, color_format: VkFormat,
 	present_mode: VkPresentModeKHR, swap_images: *mut VkImage)
 {
 	let connection = connection.0.data();
 
-	let surface = surface.surface();
+	let surface = connection.surface;
 
-	(connection.get_surface_capabilities)(gpu, surface,
+	(connection.get_surface_capabilities)(connection.gpu, connection.surface,
 		&mut mem::uninitialized()).unwrap();
 
 	(connection.new_swapchain)(
-		device,
+		connection.device,
 		&VkSwapchainCreateInfoKHR {
 			s_type: VkStructureType::SwapchainCreateInfo,
 			p_next: null(),
@@ -872,14 +851,14 @@ pub unsafe fn get_present_mode(connection: &mut Vk, gpu: VkPhysicalDevice,
 		swapchain
 	).unwrap();
 
-	(connection.get_swapcount)(device, *swapchain, image_count,
+	(connection.get_swapcount)(connection.device, *swapchain, image_count,
 		null_mut()).unwrap();
-	(connection.get_swapcount)(device, *swapchain, image_count,
+	(connection.get_swapcount)(connection.device, *swapchain, image_count,
 		swap_images).unwrap();
 }
 
-#[inline(always)] pub unsafe fn create_imgview(
-	connection: &mut Vk, device: VkDevice, image: VkImage,
+pub unsafe fn create_imgview_vkimage(
+	connection: &mut Vk, image: VkImage,
 	format: VkFormat, has_color: bool) -> VkImageView
 {
 	let connection = connection.0.data();
@@ -909,7 +888,7 @@ pub unsafe fn get_present_mode(connection: &mut Vk, gpu: VkPhysicalDevice,
 	};
 
 	(connection.create_imgview)(
-		device,
+		connection.device,
 		&VkImageViewCreateInfo {
 			s_type: VkStructureType::ImageViewCreateInfo,
 			p_next: null(),
@@ -933,21 +912,26 @@ pub unsafe fn get_present_mode(connection: &mut Vk, gpu: VkPhysicalDevice,
 	image_view
 }
 
+#[inline(always)] pub unsafe fn create_imgview(
+	connection: &mut Vk, image: &Image,
+	format: VkFormat, has_color: bool) -> VkImageView
+{
+	create_imgview_vkimage(connection, image.image().0, format, has_color)
+}
+
 pub unsafe fn end_cmdbuff(connection: &mut Vk, command_buffer: VkCommandBuffer){
 	let connection = connection.0.data();
 
 	(connection.end_cmdbuff)(command_buffer).unwrap();
 }
 
-pub unsafe fn create_fence(connection: &mut Vk, device: VkDevice)
-	-> VkFence
-{
+pub unsafe fn create_fence(connection: &mut Vk) -> VkFence {
 	let connection = connection.0.data();
 
 	let mut fence = mem::uninitialized();
 
 	(connection.create_fence)(
-		device,
+		connection.device,
 		&VkFenceCreateInfo {
 			s_type: VkStructureType::FenceCreateInfo,
 			p_next: null(),
@@ -960,13 +944,11 @@ pub unsafe fn create_fence(connection: &mut Vk, device: VkDevice)
 	fence
 }
 
-pub unsafe fn fence_drop(connection: &mut Vk, device: VkDevice,
-	fence: VkFence)
-{
+pub unsafe fn fence_drop(connection: &mut Vk, fence: VkFence) {
 	let connection = connection.0.data();
 
 	(connection.destroy_fence)(
-		device, fence, null()
+		connection.device, fence, null()
 	);
 }
 
@@ -1000,23 +982,22 @@ pub unsafe fn queue_submit(connection: &mut Vk,
 	).unwrap();
 }
 
-pub unsafe fn wait_fence(connection: &mut Vk, device: VkDevice,
-	fence: VkFence)
-{
+pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 	let connection = connection.0.data();
 
-	(connection.wait_fence)(device, 1, &fence, 1, u64::MAX).unwrap();
+	(connection.wait_fence)(connection.device, 1, &fence, 1, u64::MAX)
+		.unwrap();
 }
 
 #[inline(always)] pub unsafe fn create_image_view(
-	vulkan: &mut Vk, device: VkDevice, color_format: &VkFormat,
+	vulkan: &mut Vk, color_format: &VkFormat,
 	submit_fence: &mut VkFence, image_count: u32,
 	swap_images: &mut [VkImage; 2], image_views: &mut [VkImageView; 2],
 	command_buffer: VkCommandBuffer, present_queue: VkQueue)
 {
 //	let connection = vulkan.0.data();
 
-	*submit_fence = create_fence(vulkan, device);
+	*submit_fence = create_fence(vulkan);
 
 	for i in 0..(image_count as usize) {
 		(vulkan.0.data().begin_cmdbuff)(
@@ -1058,46 +1039,42 @@ pub unsafe fn wait_fence(connection: &mut Vk, device: VkDevice,
 		queue_submit(vulkan, command_buffer, *submit_fence,
 			VkPipelineStage::ColorAttachmentOutput, present_queue,
 			None);
-		wait_fence(vulkan, device, *submit_fence);
+		wait_fence(vulkan, *submit_fence);
 
-		(vulkan.0.data().reset_fence)(device, 1, submit_fence).unwrap();
+		(vulkan.0.data().reset_fence)(vulkan.0.data().device, 1, submit_fence).unwrap();
 		(vulkan.0.data().reset_cmdbuff)(command_buffer, 0);
 
-		image_views[i] = create_imgview(vulkan, device,
-			swap_images[i], color_format.clone(), true);
+		image_views[i] = create_imgview_vkimage(vulkan, swap_images[i],
+			color_format.clone(), true);
 	}
 }
 
 // TODO: in ms_buffer.rs
 #[inline(always)] pub unsafe fn create_ms_buffer(
-	vulkan: &mut Vk, device: VkDevice, gpu: VkPhysicalDevice,
-	color_format: &VkFormat, width: u32, height: u32)
+	vulkan: &mut Vk, color_format: &VkFormat, width: u32, height: u32)
 	-> (Image, VkImageView)
 {
-	let image = Image::new(vulkan, device, gpu, width,
-		height, color_format.clone(), VkImageTiling::Optimal,
-		VkImageUsage::TransientColorAttachment,
+	let image = Image::new(vulkan, width, height, color_format.clone(),
+		VkImageTiling::Optimal, VkImageUsage::TransientColorAttachment,
 		VkImageLayout::Undefined, 0, VK_SAMPLE_COUNT);
 
 	// create the ms image view:
-	let image_view = create_imgview(vulkan, device, image.image,
-		color_format.clone(), true);
+	let image_view = create_imgview(vulkan, &image, color_format.clone(),
+		true);
 
 	(image, image_view)
 }
 
 // TODO: in depth_buffer.rs
 #[inline(always)] pub unsafe fn create_depth_buffer(
-	vulkan: &mut Vk, device: VkDevice, gpu: VkPhysicalDevice,
-	command_buffer: VkCommandBuffer, submit_fence: VkFence,
+	vulkan: &mut Vk, command_buffer: VkCommandBuffer, submit_fence: VkFence,
 	present_queue: VkQueue, width: u32, height: u32)
 	-> (Image, VkImageView)
 {
 //	let connection = vulkan.0.data();
 
-	let image = Image::new(vulkan, device, gpu, width,
-		height, VkFormat::D16Unorm, VkImageTiling::Optimal,
-		VkImageUsage::DepthStencilAttachmentBit,
+	let image = Image::new(vulkan, width, height, VkFormat::D16Unorm,
+		VkImageTiling::Optimal, VkImageUsage::DepthStencilAttachmentBit,
 		VkImageLayout::Undefined, 0, VK_SAMPLE_COUNT);
 
 	// before using this depth buffer we must change it's layout:
@@ -1132,7 +1109,7 @@ pub unsafe fn wait_fence(connection: &mut Vk, device: VkDevice,
 				VkImageLayout::DepthStencilAttachmentOptimal,
 			src_queue_family_index: !0,
 			dst_queue_family_index: !0,
-			image: image.image,
+			image: image.image().0,
 			subresource_range: VkImageSubresourceRange {
 				aspect_mask: VkImageAspectFlags::Depth,
 				base_mip_level: 0,
@@ -1146,27 +1123,28 @@ pub unsafe fn wait_fence(connection: &mut Vk, device: VkDevice,
 	end_cmdbuff(vulkan, command_buffer);
 	queue_submit(vulkan, command_buffer, submit_fence,
 		VkPipelineStage::ColorAttachmentOutput, present_queue, None);
-	wait_fence(vulkan, device, submit_fence);
+	wait_fence(vulkan, submit_fence);
 
-	(vulkan.0.data().reset_fence)(device, 1, &submit_fence).unwrap();
+	(vulkan.0.data().reset_fence)(vulkan.0.data().device, 1, &submit_fence)
+		.unwrap();
 	(vulkan.0.data().reset_cmdbuff)(command_buffer, 0);
 
 	// create the depth image view:
-	let image_view = create_imgview(vulkan, device, image.image,
-		VkFormat::D16Unorm, false);
+	let image_view = create_imgview(vulkan, &image, VkFormat::D16Unorm,
+		false);
 
 	(image, image_view)
 }
 
 #[inline(always)] pub unsafe fn create_render_pass(
-	connection: &mut Vk, device: VkDevice, color_format: &VkFormat)
+	connection: &mut Vk, color_format: &VkFormat)
 	-> VkRenderPass
 {
 	let connection = connection.0.data();
 	let mut render_pass = mem::uninitialized();
 
 	(connection.new_renderpass)(
-		device,
+		connection.device,
 		&VkRenderPassCreateInfo {
 			s_type: VkStructureType::RenderPassCreateInfo,
 			p_next: null(),
@@ -1268,7 +1246,7 @@ pub unsafe fn wait_fence(connection: &mut Vk, device: VkDevice,
 }
 
 #[inline(always)] pub unsafe fn create_framebuffers(
-	connection: &mut Vk, device: VkDevice, image_count: u32,
+	connection: &mut Vk, image_count: u32,
 	render_pass: VkRenderPass, present_imgviews: &[VkImageView],
 	multisample_imgview: VkImageView, depth_imgview: VkImageView,
 	width: u32, height: u32, fbs: &mut[VkFramebuffer])
@@ -1278,7 +1256,7 @@ pub unsafe fn wait_fence(connection: &mut Vk, device: VkDevice,
 	// create a framebuffer per swap chain imageView:
 	for i in 0..(image_count as usize) {
 		(connection.create_framebuffer)(
-			device,
+			connection.device,
 			&VkFramebufferCreateInfo {
 				s_type: VkStructureType::FramebufferCreateInfo,
 				p_next: null(),
@@ -1299,13 +1277,13 @@ pub unsafe fn wait_fence(connection: &mut Vk, device: VkDevice,
 }
 
 #[inline(always)] pub unsafe fn destroy_swapchain(
-	connection: &mut Vk, device: VkDevice,
-	frame_buffers: &[VkFramebuffer], present_imgviews: &[VkImageView],
-	depth_imgview: VkImageView, render_pass: VkRenderPass, image_count: u32,
-	depth_image: VkImage, swapchain: VkSwapchainKHR,
-	_/*depth_image_memory*/: VkDeviceMemory)
+	connection: &mut Vk, frame_buffers: &[VkFramebuffer],
+	present_imgviews: &[VkImageView], depth_imgview: VkImageView,
+	render_pass: VkRenderPass, image_count: u32,
+	swapchain: VkSwapchainKHR)
 {
 	let connection = connection.0.data();
+	let device = connection.device;
 
 	// Free framebuffers & image view #1
 	for i in 0..(image_count as usize) {
@@ -1317,10 +1295,8 @@ pub unsafe fn wait_fence(connection: &mut Vk, device: VkDevice,
 	}
 	// Free render pass
 	(connection.drop_renderpass)(device, render_pass, null());
-	// Free depth buffer
+	// Free depth image view
 	(connection.drop_imgview)(device, depth_imgview, null());
-	(connection.drop_image)(device, depth_image, null());
-//	(connection.drop_memory)(device, depth_image_memory, null());
 	// Free image view #2
 //	vkDestroyFence(vulkan->device, vulkan->submit_fence, NULL);  // TODO: Mem Error
 	// Free swapchain
@@ -1468,19 +1444,18 @@ pub(crate) unsafe fn txuniform<T>(vulkan: &mut Vk, device: VkDevice,
 	writer.update_descriptor_sets(vulkan, device);
 }
 
-pub unsafe fn vw_camera_new(connection: &mut Vk, device: VkDevice,
-	gpu: VkPhysicalDevice, fog_color: (f32, f32, f32, f32),
-	range: (f32, f32)) ->
-	 (Memory<TransformUniform>, Memory<FogUniform>)
+pub unsafe fn vw_camera_new(connection: &mut Vk,
+	fog_color: (f32, f32, f32, f32), range: (f32, f32))
+	 -> (Memory<TransformUniform>, Memory<FogUniform>)
 {
-	let ucamera_memory = Memory::new(connection, device, gpu,
+	let ucamera_memory = Memory::new(connection,
 		TransformUniform {
 			mat4: [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
 				1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
 		}
 	);
 
-	let ueffect_memory = Memory::new(connection, device, gpu,
+	let ueffect_memory = Memory::new(connection,
 		FogUniform {
 			fogc: [fog_color.0, fog_color.1, fog_color.2, fog_color.3],
 			fogr: [range.0, range.1],
@@ -1490,10 +1465,8 @@ pub unsafe fn vw_camera_new(connection: &mut Vk, device: VkDevice,
 	(ucamera_memory, ueffect_memory)
 }
 
-pub unsafe fn vw_instance_new<T>(vulkan: &mut Vk,
-	device: VkDevice, gpu: VkPhysicalDevice, pipeline: Style,
-	buffer_data: T,
-	camera_memory: &Memory<TransformUniform>,
+pub unsafe fn vw_instance_new<T>(vulkan: &mut Vk, pipeline: Style,
+	buffer_data: T, camera_memory: &Memory<TransformUniform>,
 	effect_memory: &Memory<FogUniform>,
 	tex_view: VkImageView, tex_sampler: VkSampler, tex_count: bool)
 	-> VwInstance
@@ -1506,7 +1479,7 @@ pub unsafe fn vw_instance_new<T>(vulkan: &mut Vk,
 
 	// Descriptor Pool
 	(vulkan.0.data().new_descpool)(
-		device,
+		vulkan.0.data().device,
 		// TODO: based on new_pipeline()
 		&VkDescriptorPoolCreateInfo {
 			s_type: VkStructureType::DescriptorPoolCreateInfo,
@@ -1549,7 +1522,7 @@ pub unsafe fn vw_instance_new<T>(vulkan: &mut Vk,
 	).unwrap();
 
 	(vulkan.0.data().new_descsets)(
-		device,
+		vulkan.0.data().device,
 		&VkDescriptorSetAllocateInfo {
 			s_type: VkStructureType::DescriptorSetAllocateInfo,
 			next: null(),
@@ -1561,9 +1534,11 @@ pub unsafe fn vw_instance_new<T>(vulkan: &mut Vk,
 	).unwrap();
 
 	// Allocate memory for uniform buffer.
-	let uniform_memory = Memory::new(vulkan, device, gpu, buffer_data);
+	let uniform_memory = Memory::new(vulkan, buffer_data);
 
 // }
+	let device = vulkan.0.data().device;
+
 	txuniform(vulkan, device, desc_set, tex_count, tex_sampler,
 		tex_view, &uniform_memory, &camera_memory, &effect_memory);
 
@@ -1584,9 +1559,7 @@ pub struct Shape {
 impl Shape {
 	/// Create a Shape.  `vertices` is a slice of triangle strips that make
 	/// up the shape.
-	pub fn new(vulkan: &mut Vk, device: VkDevice,
-		gpu: VkPhysicalDevice, vertices: &[f32]) -> Shape
-	{
+	pub fn new(vulkan: &mut Vk, vertices: &[f32]) -> Shape {
 //		let connection = vulkan.0.data();
 
 		let size = (mem::size_of::<f32>() * vertices.len()) as u64;
@@ -1599,7 +1572,7 @@ impl Shape {
 
 			// Create the buffer.
 			(vulkan.0.data().new_buffer)(
-				device,
+				vulkan.0.data().device,
 				&VkBufferCreateInfo {
 					s_type: VkStructureType::BufferCreateInfo,
 					next: null(),
@@ -1616,20 +1589,19 @@ impl Shape {
 
 			// Allocate memory for vertex buffer.
 			(vulkan.0.data().get_bufmemreq)(
-				device,
+				vulkan.0.data().device,
 				vertex_input_buffer,
 				&mut vb_memreqs,
 			);
 
 			(vulkan.0.data().mem_allocate)(
-				device,
+				vulkan.0.data().device,
 				&VkMemoryAllocateInfo {
 					s_type: VkStructureType::MemoryAllocateInfo,
 					next: null(),
 					allocation_size: vb_memreqs.size,
 					memory_type_index: get_memory_type(
 						vulkan,
-						gpu,
 						vb_memreqs.memory_type_bits,
 						VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ),
 				},
@@ -1641,7 +1613,7 @@ impl Shape {
 			let mut mapped = mem::uninitialized();
 
 			(vulkan.0.data().mapmem)(
-				device,
+				vulkan.0.data().device,
 				vertex_buffer_memory,
 				0,
 				size,
@@ -1652,10 +1624,11 @@ impl Shape {
 			ptr::copy_nonoverlapping(vertices.as_ptr(),
 				mapped as *mut f32, vertices.len());
 
-			(vulkan.0.data().unmap)(device, vertex_buffer_memory);
+			(vulkan.0.data().unmap)(vulkan.0.data().device,
+				vertex_buffer_memory);
 
 			(vulkan.0.data().bind_buffer_mem)(
-				device,
+				vulkan.0.data().device,
 				vertex_input_buffer,
 				vertex_buffer_memory,
 				0
@@ -1667,8 +1640,8 @@ impl Shape {
 	}
 }
 
-pub unsafe fn new_buffer(vulkan: &mut Vk, device: VkDevice,
-	gpu: VkPhysicalDevice, vertices: &[f32]) -> (VkBuffer, VkDeviceMemory)
+pub unsafe fn new_buffer(vulkan: &mut Vk, vertices: &[f32])
+	-> (VkBuffer, VkDeviceMemory)
 {
 //	let connection = vulkan.0.data();
 
@@ -1681,7 +1654,7 @@ pub unsafe fn new_buffer(vulkan: &mut Vk, device: VkDevice,
 	// Create Vertex Buffer
 	// TODO: Use `Buffer` Type
 	(vulkan.0.data().new_buffer)(
-		device,
+		vulkan.0.data().device,
 		&VkBufferCreateInfo {
 			s_type: VkStructureType::BufferCreateInfo,
 			next: null(),
@@ -1698,20 +1671,19 @@ pub unsafe fn new_buffer(vulkan: &mut Vk, device: VkDevice,
 
 	// Allocate memory for vertex buffer.
 	(vulkan.0.data().get_bufmemreq)(
-		device,
+		vulkan.0.data().device,
 		vertex_input_buffer,
 		&mut vb_memreqs,
 	);
 
 	(vulkan.0.data().mem_allocate)(
-		device,
+		vulkan.0.data().device,
 		&VkMemoryAllocateInfo {
 			s_type: VkStructureType::MemoryAllocateInfo,
 			next: null(),
 			allocation_size: vb_memreqs.size,
 			memory_type_index: get_memory_type(
 				vulkan,
-				gpu,
 				vb_memreqs.memory_type_bits,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ),
 		},
@@ -1724,7 +1696,7 @@ pub unsafe fn new_buffer(vulkan: &mut Vk, device: VkDevice,
 	let mut mapped = mem::uninitialized();
 
 	(vulkan.0.data().mapmem)(
-		device,
+		vulkan.0.data().device,
 		vertex_buffer_memory,
 		0,
 		size,
@@ -1734,10 +1706,10 @@ pub unsafe fn new_buffer(vulkan: &mut Vk, device: VkDevice,
 
 	ptr::copy_nonoverlapping(vertices.as_ptr(), mapped, vertices.len());
 
-	(vulkan.0.data().unmap)(device, vertex_buffer_memory);
+	(vulkan.0.data().unmap)(vulkan.0.data().device, vertex_buffer_memory);
 
 	(vulkan.0.data().bind_buffer_mem)(
-		device,
+		vulkan.0.data().device,
 		vertex_input_buffer,
 		vertex_buffer_memory,
 		0
@@ -1748,22 +1720,21 @@ pub unsafe fn new_buffer(vulkan: &mut Vk, device: VkDevice,
 
 pub struct ShaderModule(
 	VkShaderModule,
+	// TODO: Don't
 	VkDevice,
 	unsafe extern "system" fn(VkDevice, VkShaderModule, *const c_void) -> (),
 );
 
 impl ShaderModule {
 	/// Load a new shader module into memory.
-	pub fn new(connection: &mut Vk, device: VkDevice,
-		spirv_shader: &[u8]) -> ShaderModule
-	{
+	pub fn new(connection: &mut Vk, spirv_shader: &[u8]) -> ShaderModule {
 		let connection = connection.0.data();
 
 		let mut shader = unsafe { mem::uninitialized() };
 
 		unsafe {
 			(connection.new_shademod)(
-				device,
+				connection.device,
 				&VkShaderModuleCreateInfo {
 					s_type: VkStructureType::ShaderModuleCreateInfo,
 					next: null(),
@@ -1776,7 +1747,7 @@ impl ShaderModule {
 			).unwrap();
 		}
 
-		ShaderModule(shader, device, connection.drop_shademod)
+		ShaderModule(shader, connection.device, connection.drop_shademod)
 	}
 }
 
@@ -1788,10 +1759,9 @@ impl Drop for ShaderModule {
 	}
 }
 
-pub fn new_pipeline(connection: &mut Vk,
-	device: VkDevice, render_pass: VkRenderPass, width: u32, height: u32,
-	vertex: &ShaderModule, fragment: &ShaderModule, ntextures: u32,
-	nvbuffers: u32, alpha: bool) -> Style
+pub fn new_pipeline(connection: &mut Vk, render_pass: VkRenderPass, width: u32,
+	height: u32, vertex: &ShaderModule, fragment: &ShaderModule,
+	ntextures: u32, nvbuffers: u32, alpha: bool) -> Style
 { unsafe {
 	let connection = connection.0.data();
 
@@ -1811,7 +1781,7 @@ pub fn new_pipeline(connection: &mut Vk,
 	};
 
 	(connection.new_descset_layout)(
-		device,
+		connection.device,
 		&VkDescriptorSetLayoutCreateInfo {
 			s_type: VkStructureType::DescriptorSetLayoutCreateInfo,
 			next: null(),
@@ -1877,7 +1847,7 @@ pub fn new_pipeline(connection: &mut Vk,
 
 	// pipeline layout:
 	(connection.new_pipeline_layout)(
-		device,
+		connection.device,
 		&VkPipelineLayoutCreateInfo {
 			s_type: VkStructureType::PipelineLayoutCreateInfo,
 			next: null(),
@@ -1893,7 +1863,7 @@ pub fn new_pipeline(connection: &mut Vk,
 
 	// setup shader stages:
 	(connection.new_pipeline)(
-		device,
+		connection.device,
 		mem::zeroed(),
 		1,
 		&VkGraphicsPipelineCreateInfo {
