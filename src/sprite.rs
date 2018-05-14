@@ -24,14 +24,13 @@ pub struct Sprite {
 	pub matrix_buffer: VkBuffer,
 	pub uniform_memory: VkDeviceMemory,
 	pub desc_set: Child<Vulkan, VkObject>,
-//	pub desc_set: VkDescriptorSet,
-//	pub desc_pool: VkDescriptorPool,
-	pub pipeline: Style,
+	pub pipeline: VkPipeline,
+	pub pipeline_layout: VkPipelineLayout,
 }
 
 impl Sprite {
 	/// Create a new sprite.
-	pub unsafe fn new<T>(vulkan: &mut Vk, pipeline: Style,
+	pub unsafe fn new<T>(vulkan: &mut Vk, pipeline: &Style,
 		buffer_data: T, camera_memory: &Memory<TransformUniform>,
 		effect_memory: &Memory<FogUniform>,
 		tex_view: VkImageView, tex_count: bool)
@@ -93,7 +92,7 @@ impl Sprite {
 				next: null(),
 				descriptor_pool: desc_pool,
 				descriptor_set_count: 1,
-				set_layouts: &pipeline.descsetlayout
+				set_layouts: &pipeline.style().2/*descsetlayout*/
 			},
 			&mut desc_set
 		).unwrap();
@@ -113,8 +112,9 @@ impl Sprite {
 			matrix_buffer: uniform_memory.buffer.buffer,
 			uniform_memory: uniform_memory.memory,
 			desc_set: Child::new(&vulkan.0, VkObject::new(
-				VkType::Sprite, desc_set, desc_pool)),
-			pipeline
+				VkType::Sprite, desc_set, desc_pool, 0)),
+			pipeline: pipeline.style().0/*pipeline*/,
+			pipeline_layout: pipeline.style().1/*pipeline_layout*/,
 		}
 	}
 

@@ -86,7 +86,7 @@ impl Image {
 			image_memory, 0).unwrap();
 
 		Image(Child::new(&vulkan.0,
-			VkObject::new(VkType::Image, image, image_memory)))
+			VkObject::new(VkType::Image, image, image_memory, 0)))
 	} }
 
 	pub (crate) fn image(&self) -> (u64, u64) {

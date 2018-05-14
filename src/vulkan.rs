@@ -260,12 +260,18 @@ pub struct Vulkan {
 	pub(crate) new_pipeline: unsafe extern "system" fn(VkDevice, VkPipelineCache, u32,
 		*const VkGraphicsPipelineCreateInfo, *const c_void,
 		*mut VkPipeline) -> VkResult,
+	pub(crate) drop_pipeline: unsafe extern "system" fn(VkDevice,
+		VkPipeline, *const c_void) -> (),
 	pub(crate) new_pipeline_layout: unsafe extern "system" fn(VkDevice,
 		*const VkPipelineLayoutCreateInfo, *const c_void,
 		*mut VkPipelineLayout) -> VkResult,
+	pub(crate) drop_pipeline_layout: unsafe extern "system" fn(VkDevice,
+		VkPipelineLayout, *const c_void) -> (),
 	pub(crate) new_descset_layout: unsafe extern "system" fn(VkDevice,
 		*const VkDescriptorSetLayoutCreateInfo, *const c_void,
 		*mut VkDescriptorSetLayout) -> VkResult,
+	pub(crate) drop_descset_layout: unsafe extern "system" fn(VkDevice,
+		VkDescriptorSetLayout, *const c_void) -> (),
 	pub(crate) bind_vb: unsafe extern "system" fn(VkCommandBuffer, u32, u32,
 		*const VkBuffer, *const VkDeviceSize) -> (),
 	pub(crate) bind_pipeline: unsafe extern "system" fn(VkCommandBuffer,
@@ -372,10 +378,15 @@ impl Vulkan {
 			new_shademod: vk_sym(vk, vksym, b"vkCreateShaderModule\0"),
 			drop_shademod: vk_sym(vk, vksym, b"vkDestroyShaderModule\0"),
 			new_pipeline: vk_sym(vk, vksym, b"vkCreateGraphicsPipelines\0"),
+			drop_pipeline: vk_sym(vk, vksym, b"vkDestroyPipeline\0"),
 			new_pipeline_layout:
 				vk_sym(vk, vksym, b"vkCreatePipelineLayout\0"),
+			drop_pipeline_layout: vk_sym(vk, vksym,
+				b"vkDestroyPipelineLayout\0"),
 			new_descset_layout:
 				vk_sym(vk, vksym, b"vkCreateDescriptorSetLayout\0"),
+			drop_descset_layout: vk_sym(vk, vksym,
+				b"vkDestroyDescriptorSetLayout\0"),
 			bind_vb: vk_sym(vk, vksym, b"vkCmdBindVertexBuffers\0"),
 			bind_pipeline: vk_sym(vk, vksym, b"vkCmdBindPipeline\0"),
 			bind_descsets: vk_sym(vk, vksym, b"vkCmdBindDescriptorSets\0"),
@@ -404,20 +415,28 @@ impl Vulkan {
 pub enum VkType {
 	Image,
 	Sprite,
+	Style,
 }
 
 pub struct VkObject {
 	vk_type: VkType,
 	value_a: u64,
 	value_b: u64,
+	value_c: u64,
 }
 
 impl VkObject {
-	pub fn new(vk_type: VkType, value_a: u64, value_b: u64) -> Self {
-		VkObject { vk_type, value_a, value_b }
+	pub fn new(vk_type: VkType, value_a: u64, value_b: u64, value_c: u64)
+		-> Self
+	{
+		VkObject { vk_type, value_a, value_b, value_c }
 	}
 
 	pub fn image(&self) -> (u64, u64) { (self.value_a, self.value_b) }
+
+	pub fn style(&self) -> (u64, u64, u64) {
+		(self.value_a, self.value_b, self.value_c)
+	}
 }
 
 impl ::ami::PseudoDrop for VkObject {
@@ -429,6 +448,7 @@ impl ::ami::PseudoDrop for VkObject {
 		match self.vk_type {
 			Image => ::image::destroy(self.image(), vulkan),
 			Sprite => ::sprite::destroy(self.image(), vulkan),
+			Style => ::style::destroy(self.style(), vulkan),
 		}
 	}
 }
