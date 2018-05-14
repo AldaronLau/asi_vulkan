@@ -22,6 +22,7 @@ pub type VkSampler = u64;
 pub type VkPipeline = u64;
 pub type VkDescriptorSetLayout = u64;
 pub type VkPipelineLayout = u64;
+pub type VkImageView = u64;
 // #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSurfaceKHR(pub(crate) u64);
 // #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDeviceMemory(pub(crate) u64);
 // #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkImage(pub(crate) u64);
@@ -30,7 +31,7 @@ pub type VkPipelineLayout = u64;
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkFramebuffer(pub(crate) u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkFence(pub(crate) u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSemaphore(pub(crate)  u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkImageView(pub(crate) u64);
+// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkImageView(pub(crate) u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkBuffer(pub(crate)  u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkShaderModule(pub(crate) u64);
 // #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipeline(pub(crate) u64);
@@ -1041,7 +1042,7 @@ pub union VkClearValue {
 	Concurrent = 1,
 }
 
-#[repr(C)] #[allow(dead_code)] pub enum VkImageUsage {
+#[repr(C)] #[allow(dead_code)] #[derive(Copy, Clone, PartialEq)] pub enum VkImageUsage {
 	TransferSrcBit = 0x00000001,
 	TransferDstBit = 0x00000002,
 	SampledBit = 0x00000004,

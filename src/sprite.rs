@@ -17,6 +17,7 @@ use Vk;
 use Vulkan;
 use VkObject;
 use VkType;
+use Image;
 
 /// A render-able instance.
 pub struct Sprite {
@@ -33,7 +34,7 @@ impl Sprite {
 	pub unsafe fn new<T>(vulkan: &mut Vk, pipeline: &Style,
 		buffer_data: T, camera_memory: &Memory<TransformUniform>,
 		effect_memory: &Memory<FogUniform>,
-		tex_view: VkImageView, tex_count: bool)
+		texture: &Image, tex_count: bool)
 		 -> Self where T: Clone
 	{
 	//	let connection = vulkan.0.data();
@@ -103,7 +104,7 @@ impl Sprite {
 	// }
 		let device = vulkan.0.data().device;
 
-		txuniform(vulkan, device, desc_set, tex_count, tex_view,
+		txuniform(vulkan, device, desc_set, tex_count, texture,
 			&uniform_memory, &camera_memory, &effect_memory);
 
 		println!("NEW: Drop Desc Pool & Attached Sets");
@@ -124,7 +125,7 @@ impl Sprite {
 }
 
 unsafe fn txuniform<T>(vulkan: &mut Vk, device: VkDevice,
-	desc_set: VkDescriptorSet, hastex: bool, tex_view: VkImageView,
+	desc_set: VkDescriptorSet, hastex: bool, texture: &Image,
 	matrix_memory: &Memory<T>, camera_memory: &Memory<TransformUniform>,
 	effect_memory: &Memory<FogUniform>) where T: Clone
 {
@@ -135,7 +136,7 @@ unsafe fn txuniform<T>(vulkan: &mut Vk, device: VkDevice,
 
 	if hastex {
 		writer = writer.sampler(desc_set, vulkan.0.data().sampler,
-			tex_view);
+			texture.view());
 	}
 
 	writer.update_descriptor_sets(vulkan, device);
@@ -180,6 +181,8 @@ impl DescriptorSetWriter {
 	pub fn sampler(mut self, desc_set: VkDescriptorSet,
 		tex_sampler: VkSampler, tex_view: VkImageView) -> Self
 	{
+		println!("sampler: {:x}", tex_view);
+
 		self.sets[self.nwrites as usize] = Set::Sampler(desc_set, tex_sampler, tex_view);
 
 		self.nwrites += 1;

@@ -446,7 +446,7 @@ impl ::ami::PseudoDrop for VkObject {
 		use VkType::*;
 
 		match self.vk_type {
-			Image => ::image::destroy(self.image(), vulkan),
+			Image => ::image::destroy(self.style(), vulkan),
 			Sprite => ::sprite::destroy(self.image(), vulkan),
 			Style => ::style::destroy(self.style(), vulkan),
 		}

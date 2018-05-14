@@ -43,7 +43,7 @@ impl Image {
 				p_next: null(),
 				flags: 0,
 				image_type: VkImageType::Dim2d,
-				format,
+				format: format.clone(),
 				extent: VkExtent3D {
 					width: width,
 					height: height,
@@ -85,25 +85,36 @@ impl Image {
 		(vulkan.0.data().bind_imgmem)(vulkan.0.data().device, image,
 			image_memory, 0).unwrap();
 
-		Image(Child::new(&vulkan.0,
-			VkObject::new(VkType::Image, image, image_memory, 0)))
+		let image_view = ::create_img_view(vulkan, image,
+			format.clone(),
+			usage != VkImageUsage::DepthStencilAttachmentBit
+		);
+
+		Image(Child::new(&vulkan.0, VkObject::new(VkType::Image, image,
+			image_memory, image_view)))
 	} }
 
-	pub (crate) fn image(&self) -> (u64, u64) {
-		self.0.data().image()
+	pub (crate) fn image(&self) -> (u64, u64, u64) {
+		self.0.data().style()
 	}
 
 	/// Get the memory handle for this image.
 	pub fn memory(&self) -> u64 {
 		self.image().1
 	}
+
+	/// Get the image view for thsi image
+	pub fn view(&self) -> u64 {
+		self.image().2
+	}
 }
 
-#[inline(always)] pub(crate) fn destroy(image: (u64, u64), c: &mut Vulkan) {
+#[inline(always)] pub(crate) fn destroy(image: (u64, u64, u64), c: &mut Vulkan){
 	// Run Drop Function
 	unsafe {
 		(c.drop_image)(c.device, image.0, null());
 		(c.drop_memory)(c.device, image.1, null());
+		(c.drop_imgview)(c.device, image.2, null());
 	}
 
 	println!("TEST: Drop Image");

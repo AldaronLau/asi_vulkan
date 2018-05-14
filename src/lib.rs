@@ -18,6 +18,7 @@ mod surface;
 mod vulkan;
 mod sprite;
 mod style;
+// mod texture;
 
 //
 use std::{ mem, u64 };
@@ -33,6 +34,7 @@ pub use self::surface::{ new_surface_xcb, new_surface_windows };
 pub use self::vulkan::Vk;
 pub use self::sprite::Sprite;
 pub use self::style::Style;
+// pub use self::texture::Texture;
 
 //
 use self::types::*;
@@ -833,8 +835,7 @@ pub unsafe fn get_present_mode(connection: &mut Vk) -> VkPresentModeKHR {
 		swap_images).unwrap();
 }
 
-pub unsafe fn create_imgview_vkimage(
-	connection: &mut Vk, image: VkImage,
+pub unsafe fn create_img_view(connection: &mut Vk, image: VkImage,
 	format: VkFormat, has_color: bool) -> VkImageView
 {
 	let connection = connection.0.data();
@@ -888,12 +889,13 @@ pub unsafe fn create_imgview_vkimage(
 	image_view
 }
 
+/* TODO: Remove
 #[inline(always)] pub unsafe fn create_imgview(
 	connection: &mut Vk, image: &Image,
 	format: VkFormat, has_color: bool) -> VkImageView
 {
-	create_imgview_vkimage(connection, image.image().0, format, has_color)
-}
+	create_img_view(connection, image.image().0, format, has_color)
+}*/
 
 pub unsafe fn end_cmdbuff(connection: &mut Vk) {
 	let connection = connection.0.data();
@@ -1019,7 +1021,7 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 		(vulkan.0.data().reset_fence)(vulkan.0.data().device, 1, submit_fence).unwrap();
 		(vulkan.0.data().reset_cmdbuff)(vulkan.0.data().command_buffer, 0);
 
-		image_views[i] = create_imgview_vkimage(vulkan, swap_images[i],
+		image_views[i] = create_img_view(vulkan, swap_images[i],
 			color_format.clone(), true);
 	}
 }
@@ -1027,23 +1029,24 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 // TODO: in ms_buffer.rs
 #[inline(always)] pub unsafe fn create_ms_buffer(
 	vulkan: &mut Vk, color_format: &VkFormat, width: u32, height: u32)
-	-> (Image, VkImageView)
+	-> Image
 {
 	let image = Image::new(vulkan, width, height, color_format.clone(),
 		VkImageTiling::Optimal, VkImageUsage::TransientColorAttachment,
 		VkImageLayout::Undefined, 0, VK_SAMPLE_COUNT);
 
 	// create the ms image view:
-	let image_view = create_imgview(vulkan, &image, color_format.clone(),
-		true);
+//	let image_view = create_imgview(vulkan, &image, color_format.clone(),
+//		true);
 
-	(image, image_view)
+//	(image, image_view)
+	image
 }
 
 // TODO: in depth_buffer.rs
 #[inline(always)] pub unsafe fn create_depth_buffer(
 	vulkan: &mut Vk, submit_fence: VkFence, present_queue: VkQueue,
-	width: u32, height: u32) -> (Image, VkImageView)
+	width: u32, height: u32) -> Image
 {
 //	let connection = vulkan.0.data();
 
@@ -1103,11 +1106,7 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 		.unwrap();
 	(vulkan.0.data().reset_cmdbuff)(vulkan.0.data().command_buffer, 0);
 
-	// create the depth image view:
-	let image_view = create_imgview(vulkan, &image, VkFormat::D16Unorm,
-		false);
-
-	(image, image_view)
+	image
 }
 
 #[inline(always)] pub unsafe fn create_render_pass(
@@ -1222,7 +1221,7 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 #[inline(always)] pub unsafe fn create_framebuffers(
 	connection: &mut Vk, image_count: u32,
 	render_pass: VkRenderPass, present_imgviews: &[VkImageView],
-	multisample_imgview: VkImageView, depth_imgview: VkImageView,
+	multisample_img: &Image, depth_img: &Image,
 	width: u32, height: u32, fbs: &mut[VkFramebuffer])
 {
 	let connection = connection.0.data();
@@ -1237,8 +1236,8 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 				flags: 0,
 				attachment_count: 3,
 				attachments: [
-					multisample_imgview,
-					depth_imgview,
+					multisample_img.image().2,
+					depth_img.image().2,
 					present_imgviews[i],
 				].as_ptr(),
 				layers: 1,
@@ -1252,7 +1251,7 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 
 #[inline(always)] pub unsafe fn destroy_swapchain(
 	connection: &mut Vk, frame_buffers: &[VkFramebuffer],
-	present_imgviews: &[VkImageView], depth_imgview: VkImageView,
+	present_imgviews: &[VkImageView],/* depth_imgview: VkImageView,*/
 	render_pass: VkRenderPass, image_count: u32,
 	swapchain: VkSwapchainKHR)
 {
@@ -1270,7 +1269,7 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 	// Free render pass
 	(connection.drop_renderpass)(device, render_pass, null());
 	// Free depth image view
-	(connection.drop_imgview)(device, depth_imgview, null());
+//	(connection.drop_imgview)(device, depth_imgview, null());
 	// Free image view #2
 //	vkDestroyFence(vulkan->device, vulkan->submit_fence, NULL);  // TODO: Mem Error
 	// Free swapchain
