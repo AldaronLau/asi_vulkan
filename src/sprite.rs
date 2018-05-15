@@ -31,15 +31,20 @@ pub struct Sprite {
 impl Sprite {
 	/// Create a new sprite.
 	pub unsafe fn new<T>(vulkan: &mut Vk, pipeline: &Style,
-		buffer_data: T, camera_memory: &Memory<TransformUniform>,
-		effect_memory: &Memory<FogUniform>,
-		texture: &Image, tex_count: bool)
+		buffer_data: T,
+		camera_memory: &Memory<TransformUniform>,
+		effect_memory: Option<&Memory<FogUniform>>,
+		texture: Option<&Image>, tex_count: bool)
 		 -> Self where T: Clone
 	{
+		println!("Ni s");
+
 	//	let connection = vulkan.0.data();
 
 		let mut desc_pool = mem::uninitialized();
 		let mut desc_set = mem::uninitialized();
+
+		println!("Descriptor Pool");
 
 		// Descriptor Pool
 		(vulkan.0.data().new_descpool)(
@@ -85,6 +90,8 @@ impl Sprite {
 			&mut desc_pool
 		).unwrap();
 
+		println!("New Descsets");
+
 		(vulkan.0.data().new_descsets)(
 			vulkan.0.data().device,
 			&VkDescriptorSetAllocateInfo {
@@ -97,6 +104,8 @@ impl Sprite {
 			&mut desc_set
 		).unwrap();
 
+		println!("Uniform Memory");
+
 		// Allocate memory for uniform buffer.
 		let uniform_memory = Buffer::new(vulkan, &[buffer_data],
 			BufferBuilderType::Uniform);
@@ -104,8 +113,10 @@ impl Sprite {
 	// }
 		let device = vulkan.0.data().device;
 
+		println!("TXU");
+
 		txuniform(vulkan, device, desc_set, tex_count, texture,
-			&uniform_memory, &camera_memory, &effect_memory);
+			&uniform_memory, camera_memory, effect_memory);
 
 		println!("NEW: Drop Desc Pool & Attached Sets");
 
@@ -124,18 +135,22 @@ impl Sprite {
 }
 
 unsafe fn txuniform(vulkan: &mut Vk, device: VkDevice,
-	desc_set: VkDescriptorSet, hastex: bool, texture: &Image,
-	matrix_memory: &Buffer, camera_memory: &Memory<TransformUniform>,
-	effect_memory: &Memory<FogUniform>)
+	desc_set: VkDescriptorSet, hastex: bool, texture: Option<&Image>,
+	matrix_memory: &Buffer,
+	camera_memory: &Memory<TransformUniform>,
+	effect_memory: Option<&Memory<FogUniform>>)
 {
 	let mut writer = DescriptorSetWriter::new()
 		.uniform(desc_set, matrix_memory)
-		.uniform(desc_set, &camera_memory.buffer)
-		.uniform(desc_set, &effect_memory.buffer);
+		.uniform(desc_set, &camera_memory.buffer);
+
+	if let Some(memory) = effect_memory {
+		writer = writer.uniform(desc_set, &memory.buffer);
+	}
 
 	if hastex {
 		writer = writer.sampler(desc_set, vulkan.0.data().sampler,
-			texture.view());
+			texture.unwrap().view());
 	}
 
 	writer.update_descriptor_sets(vulkan, device);
@@ -271,6 +286,4 @@ enum Set {
 	unsafe {
 		(c.drop_descpool)(c.device, desc.1, null());
 	}
-
-	println!("TEST: Drop Desc Pool & Attached Sets");
 }

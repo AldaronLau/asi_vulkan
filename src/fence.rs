@@ -34,8 +34,6 @@ impl Fence {
 	unsafe {
 		(c.destroy_fence)(c.device, fence, null());
 	}
-
-	println!("TEST: Drop Fence");
 }
 
 unsafe fn create_fence(connection: &mut Vk) -> VkFence {

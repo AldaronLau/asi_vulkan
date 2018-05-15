@@ -140,6 +140,4 @@ impl Buffer {
 		(c.drop_buffer)(c.device, buffer.0, null());
 		(c.drop_memory)(c.device, buffer.1, null());
 	}
-
-	println!("TEST: Drop Buffer");
 }

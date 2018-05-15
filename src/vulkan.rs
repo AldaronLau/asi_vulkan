@@ -538,6 +538,6 @@ impl Drop for Vulkan {
 		// Run Function
 		unsafe { destroy(self.vk, null_mut()) }
 		// TODO: Drop lib in asi
-		println!("FIXME: DROP {:?}", self.lib);
+		println!("FIXME: Drop dl {:?}", self.lib);
 	}
 }
