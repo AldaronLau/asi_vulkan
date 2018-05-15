@@ -4,12 +4,7 @@
 //
 // src/memory/mod.rs
 
-use std::{ mem, ptr };
-use libc::c_void;
-
-use vulkan;
 use Vk;
-use types::*;
 
 mod buffer;
 
@@ -18,13 +13,7 @@ pub(crate) use self::buffer::destroy;
 
 pub struct Memory<T> where T: Clone {
 	pub data: T,
-//	pub memory: VkDeviceMemory,
 	pub buffer: buffer::Buffer,
-//	#[allow(unused)] // TODO
-//	device: VkDevice,
-//	#[allow(unused)] // TODO
-//	dropfn: unsafe extern "system" fn(VkDevice, VkDeviceMemory,
-//		*const c_void) -> ()
 }
 
 impl<T> Memory<T> where T: Clone {

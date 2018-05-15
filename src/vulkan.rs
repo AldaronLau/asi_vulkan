@@ -420,6 +420,7 @@ pub enum VkType {
 	Sprite,
 	Style,
 	Buffer,
+	Fence,
 }
 
 pub struct VkObject {
@@ -434,6 +435,10 @@ impl VkObject {
 		-> Self
 	{
 		VkObject { vk_type, value_a, value_b, value_c }
+	}
+
+	pub fn fence(&self) -> u64 {
+		self.value_a
 	}
 
 	pub fn image(&self) -> (u64, u64) { (self.value_a, self.value_b) }
@@ -454,6 +459,7 @@ impl ::ami::PseudoDrop for VkObject {
 			Sprite => ::sprite::destroy(self.image(), vulkan),
 			Style => ::style::destroy(self.style(), vulkan),
 			Buffer => ::memory::destroy(self.image(), vulkan),
+			Fence => ::fence::destroy(self.fence(), vulkan),
 		}
 	}
 }
@@ -510,6 +516,16 @@ impl Drop for Vulkan {
 
 		// Run Function (Surface)
 		unsafe { destroy(self.vk, self.surface, null_mut()) }
+
+		// Load Function
+		type VkDestroyDevice = unsafe extern "system" fn(VkDevice,
+			*const c_void) -> ();
+		let destroy: VkDestroyDevice = unsafe {
+			sym(self, b"vkDestroyDevice\0")
+		};
+
+		// Run Function
+		unsafe { destroy(self.device, null()) }
 
 		// Load Function
 		type VkDestroyInstance = unsafe extern "system" fn(

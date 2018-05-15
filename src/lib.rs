@@ -18,7 +18,7 @@ mod surface;
 mod vulkan;
 mod sprite;
 mod style;
-// mod texture;
+mod fence;
 
 //
 use std::{ mem, u64 };
@@ -34,7 +34,7 @@ pub use self::surface::{ new_surface_xcb, new_surface_windows };
 pub use self::vulkan::Vk;
 pub use self::sprite::Sprite;
 pub use self::style::Style;
-// pub use self::texture::Texture;
+pub use self::fence::Fence;
 
 //
 use self::types::*;
@@ -903,34 +903,7 @@ pub unsafe fn end_cmdbuff(connection: &mut Vk) {
 	(connection.end_cmdbuff)(connection.command_buffer).unwrap();
 }
 
-pub unsafe fn create_fence(connection: &mut Vk) -> VkFence {
-	let connection = connection.0.data();
-
-	let mut fence = mem::uninitialized();
-
-	(connection.create_fence)(
-		connection.device,
-		&VkFenceCreateInfo {
-			s_type: VkStructureType::FenceCreateInfo,
-			p_next: null(),
-			flags: 0,
-		},
-		null(),
-		&mut fence
-	).unwrap();
-
-	fence
-}
-
-pub unsafe fn fence_drop(connection: &mut Vk, fence: VkFence) {
-	let connection = connection.0.data();
-
-	(connection.destroy_fence)(
-		connection.device, fence, null()
-	);
-}
-
-pub unsafe fn queue_submit(connection: &mut Vk, submit_fence: VkFence,
+pub unsafe fn queue_submit(connection: &mut Vk, submit_fence: &Fence,
 	pipelane_stage: VkPipelineStage, queue: VkQueue,
 	semaphore: Option<VkSemaphore>)
 {
@@ -955,26 +928,23 @@ pub unsafe fn queue_submit(connection: &mut Vk, submit_fence: VkFence,
 				null()
 			},
 		},
-		submit_fence
+		submit_fence.fence()
 	).unwrap();
 }
 
-pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
+pub unsafe fn wait_fence(connection: &mut Vk, fence: &Fence) {
 	let connection = connection.0.data();
 
-	(connection.wait_fence)(connection.device, 1, &fence, 1, u64::MAX)
-		.unwrap();
+	(connection.wait_fence)(connection.device, 1, &fence.fence(), 1,
+		u64::MAX).unwrap();
 }
 
 #[inline(always)] pub unsafe fn create_image_view(
-	vulkan: &mut Vk, color_format: &VkFormat,
-	submit_fence: &mut VkFence, image_count: u32,
+	vulkan: &mut Vk, color_format: &VkFormat, image_count: u32,
 	swap_images: &mut [VkImage; 2], image_views: &mut [VkImageView; 2],
-	present_queue: VkQueue)
+	present_queue: VkQueue) -> Fence
 {
-//	let connection = vulkan.0.data();
-
-	*submit_fence = create_fence(vulkan);
+	let submit_fence = Fence::new(vulkan);
 
 	for i in 0..(image_count as usize) {
 		(vulkan.0.data().begin_cmdbuff)(
@@ -1013,17 +983,20 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 		);
 
 		end_cmdbuff(vulkan);
-		queue_submit(vulkan, *submit_fence,
+		queue_submit(vulkan, &submit_fence,
 			VkPipelineStage::ColorAttachmentOutput, present_queue,
 			None);
-		wait_fence(vulkan, *submit_fence);
+		wait_fence(vulkan, &submit_fence);
 
-		(vulkan.0.data().reset_fence)(vulkan.0.data().device, 1, submit_fence).unwrap();
+		(vulkan.0.data().reset_fence)(vulkan.0.data().device, 1,
+			&submit_fence.fence()).unwrap();
 		(vulkan.0.data().reset_cmdbuff)(vulkan.0.data().command_buffer, 0);
 
 		image_views[i] = create_img_view(vulkan, swap_images[i],
 			color_format.clone(), true);
 	}
+
+	submit_fence
 }
 
 // TODO: in ms_buffer.rs
@@ -1045,7 +1018,7 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 
 // TODO: in depth_buffer.rs
 #[inline(always)] pub unsafe fn create_depth_buffer(
-	vulkan: &mut Vk, submit_fence: VkFence, present_queue: VkQueue,
+	vulkan: &mut Vk, submit_fence: &Fence, present_queue: VkQueue,
 	width: u32, height: u32) -> Image
 {
 //	let connection = vulkan.0.data();
@@ -1098,12 +1071,12 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: VkFence) {
 	);
 
 	end_cmdbuff(vulkan);
-	queue_submit(vulkan, submit_fence,
+	queue_submit(vulkan, &submit_fence,
 		VkPipelineStage::ColorAttachmentOutput, present_queue, None);
-	wait_fence(vulkan, submit_fence);
+	wait_fence(vulkan, &submit_fence);
 
-	(vulkan.0.data().reset_fence)(vulkan.0.data().device, 1, &submit_fence)
-		.unwrap();
+	(vulkan.0.data().reset_fence)(vulkan.0.data().device, 1,
+		&submit_fence.fence()).unwrap();
 	(vulkan.0.data().reset_cmdbuff)(vulkan.0.data().command_buffer, 0);
 
 	image
