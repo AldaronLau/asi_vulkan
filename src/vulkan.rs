@@ -1,6 +1,5 @@
-// vulkan.rs -- Aldaron's System Interface / OpenGL
-// Copyright (c) 2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
-// Licensed under the MIT LICENSE
+// "asi_vulkan" crate - Licensed under the MIT LICENSE
+//  * Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
 
 use ami::Parent;
 use { std, std::{ mem, ptr::{ null, null_mut }, ffi::CString } };
@@ -237,8 +236,6 @@ pub struct Vulkan {
 		*const c_void) -> (),
 	pub(crate) update_descsets: unsafe extern "system" fn(VkDevice, u32,
 		*const VkWriteDescriptorSet, u32, *const c_void) -> (),
-	pub(crate) drop_descsets: unsafe extern "system" fn(VkDevice, VkDescriptorPool,
-		u32, *const VkDescriptorSet) -> VkResult,
 	pub(crate) drop_descpool: unsafe extern "system" fn(VkDevice, VkDescriptorPool,
 		*const c_void) -> (),
 	pub(crate) bind_buffer_mem: unsafe extern "system" fn(VkDevice, VkBuffer,
@@ -370,7 +367,6 @@ impl Vulkan {
 			drop_memory: vk_sym(vk, vksym, b"vkFreeMemory\0\0"),
 			drop_swapchain: vk_sym(vk, vksym, b"vkDestroySwapchainKHR\0"),
 			update_descsets: vk_sym(vk, vksym, b"vkUpdateDescriptorSets\0"),
-			drop_descsets: vk_sym(vk, vksym, b"vkFreeDescriptorSets\0"),
 			drop_descpool: vk_sym(vk, vksym, b"vkDestroyDescriptorPool\0"),
 			bind_buffer_mem: vk_sym(vk, vksym, b"vkBindBufferMemory\0"),
 			get_bufmemreq: vk_sym(vk, vksym,

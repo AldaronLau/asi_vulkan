@@ -1,35 +1,27 @@
-# Aldaron's System Interface / Vulkan                                          #
-# Copyright (c) 2017-2018 Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>        #
-# Licensed under the MIT LICENSE                                               #
-#                             _        _                                       #
-#                            /@\——————/@\                                      #
-# .———  .                   |   o    o   |     .————      .            .       #
-# |   | |  .———   .———   .——.     []     .——.  |      .——    ———: ———: | .   . #
-# |   | |  |   |  |   |  \   \   <##>   /   /  |      |   |    /    /  | |   | #
-# |———  |  |   |  |   |   |   ¯        ¯   |   |   -- |   |   /    /   |  \ /  #
-# |     |  |   |  |———    |                |   |    | |   |  /    /    |   |   #
-# |     |   ———   |       |                |    ————  |   | :——— :———  |   |   #
-#                 |        \              /                              __/   #
-#                           ¯————————————¯                                     #
-# Cargo.toml                                                                   #
-
-################################################################################
+# "asi_vulkan" crate - Licensed under the MIT LICENSE
+#  * Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
+#                             _        _
+#                            /@\——————/@\
+# .———  .                   |   o    o   |     .————      .            .
+# |   | |  .———   .———   .——.     []     .——.  |      .——    ———: ———: | .   .
+# |   | |  |   |  |   |  \   \   <##>   /   /  |      |   |    /    /  | |   |
+# |———  |  |   |  |   |   |   ¯        ¯   |   |   -- |   |   /    /   |  \ /
+# |     |  |   |  |———    |                |   |    | |   |  /    /    |   |
+# |     |   ———   |       |                |    ————  |   | :——— :———  |   |
+#                 |        \              /                              __/
+#                           ¯————————————¯
 
 [package]
 name = "asi_vulkan"
-version = "0.3.0"
+version = "0.4.0"
 authors = [
-	"Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>"
+	"Jeron A. Lau <jeron.lau@plopgrizzly.com>"
 ]
-
-################################################################################
 
 license = "MIT"
 documentation = "https://docs.rs/asi_vulkan"
 homepage = "http://plopgrizzly.com/asi_vulkan"
 repository = "https://github.com/plopgrizzly/asi_vulkan"
-
-################################################################################
 
 readme = "README.md"
 description = """
@@ -40,21 +32,15 @@ keywords = ["vulkan"]
 categories = ["rendering::graphics-api", "hardware-support",
 	"api-bindings", "rendering", "external-ffi-bindings"]
 
-################################################################################
-
 exclude = [
 	"examples/*", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", ".gitignore",
-	"_config.yml", "ISSUE_TEMPLATE.md", "icon.png", "icon.ico"
+	"_config.yml", "ISSUE_TEMPLATE.md"
 ]
 
-################################################################################
-
 [dependencies]
-ami = { path = "../ami" }
+ami = "^0.7"
 libc = "^0.2"
 
 [features]
-default = [] # ["checks"]
+default = [] # ["checks"] # Un-comment for validation layers.
 checks = []
-
-################################################################################

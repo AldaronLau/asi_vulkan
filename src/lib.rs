@@ -1,18 +1,13 @@
-// Aldaron's System Interface / Vulkan
-// Copyright (c) 2017-2018 Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>
-// Licensed under the MIT LICENSE
-//
-// src/lib.rs
+// "asi_vulkan" crate - Licensed under the MIT LICENSE
+//  * Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
 
 extern crate ami;
 extern crate libc;
 
 // Modules
-pub mod instance;
 pub mod types;
 pub mod memory;
 
-mod depth_buffer;
 mod image;
 mod surface;
 mod vulkan;
@@ -27,7 +22,6 @@ use libc::c_void;
 
 // Export Types
 pub use self::memory::{ Memory, Buffer, BufferBuilderType };
-pub use self::depth_buffer::DepthBuffer;
 pub use self::image::Image;
 pub use self::surface::{ new_surface_xcb, new_surface_windows };
 pub use self::vulkan::Vk;
@@ -888,14 +882,6 @@ pub unsafe fn create_img_view(connection: &mut Vk, image: VkImage,
 	image_view
 }
 
-/* TODO: Remove
-#[inline(always)] pub unsafe fn create_imgview(
-	connection: &mut Vk, image: &Image,
-	format: VkFormat, has_color: bool) -> VkImageView
-{
-	create_img_view(connection, image.image().0, format, has_color)
-}*/
-
 pub unsafe fn end_cmdbuff(connection: &mut Vk) {
 	let connection = connection.0.data();
 
@@ -998,24 +984,15 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: &Fence) {
 	submit_fence
 }
 
-// TODO: in ms_buffer.rs
 #[inline(always)] pub unsafe fn create_ms_buffer(
 	vulkan: &mut Vk, color_format: &VkFormat, width: u32, height: u32)
 	-> Image
 {
-	let image = Image::new(vulkan, width, height, color_format.clone(),
+	Image::new(vulkan, width, height, color_format.clone(),
 		VkImageTiling::Optimal, VkImageUsage::TransientColorAttachment,
-		VkImageLayout::Undefined, 0, VK_SAMPLE_COUNT);
-
-	// create the ms image view:
-//	let image_view = create_imgview(vulkan, &image, color_format.clone(),
-//		true);
-
-//	(image, image_view)
-	image
+		VkImageLayout::Undefined, 0, VK_SAMPLE_COUNT)
 }
 
-// TODO: in depth_buffer.rs
 #[inline(always)] pub unsafe fn create_depth_buffer(
 	vulkan: &mut Vk, submit_fence: &Fence, present_queue: VkQueue,
 	width: u32, height: u32) -> Image
@@ -1223,27 +1200,21 @@ pub unsafe fn wait_fence(connection: &mut Vk, fence: &Fence) {
 
 #[inline(always)] pub unsafe fn destroy_swapchain(
 	connection: &mut Vk, frame_buffers: &[VkFramebuffer],
-	present_imgviews: &[VkImageView],/* depth_imgview: VkImageView,*/
-	render_pass: VkRenderPass, image_count: u32,
-	swapchain: VkSwapchainKHR)
+	present_imgviews: &[VkImageView], render_pass: VkRenderPass,
+	image_count: u32, swapchain: VkSwapchainKHR)
 {
 	let connection = connection.0.data();
 	let device = connection.device;
 
-	// Free framebuffers & image view #1
+	// Free framebuffers & present image views
 	for i in 0..(image_count as usize) {
 		(connection.drop_framebuffer)(device, frame_buffers[i],
 			null());
 		(connection.drop_imgview)(device, present_imgviews[i],
 			null());
-//		(connection.drop_image)(device, present_images[i], null());
 	}
 	// Free render pass
 	(connection.drop_renderpass)(device, render_pass, null());
-	// Free depth image view
-//	(connection.drop_imgview)(device, depth_imgview, null());
-	// Free image view #2
-//	vkDestroyFence(vulkan->device, vulkan->submit_fence, NULL);  // TODO: Mem Error
 	// Free swapchain
 	(connection.drop_swapchain)(device, swapchain, null());
 }
@@ -1268,96 +1239,6 @@ pub unsafe fn vw_camera_new(connection: &mut Vk,
 
 	(ucamera_memory, ueffect_memory)
 }
-
-/*
-/// A render-able shape made of triangle strips.
-pub struct Shape {
-	buffers: (VkBuffer, VkDeviceMemory),
-}
-
-impl Shape {
-	/// Create a Shape.  `vertices` is a slice of triangle strips that make
-	/// up the shape.
-	pub fn new(vulkan: &mut Vk, vertices: &[f32]) -> Shape {
-//		let connection = vulkan.0.data();
-
-		let size = (mem::size_of::<f32>() * vertices.len()) as u64;
-
-		// Go through all of the triangle strips.
-		unsafe { // start unsafe
-			let mut vb_memreqs = mem::uninitialized();
-			let mut vertex_input_buffer = mem::uninitialized();
-			let mut vertex_buffer_memory = mem::uninitialized();
-
-			// Create the buffer.
-			(vulkan.0.data().new_buffer)(
-				vulkan.0.data().device,
-				&VkBufferCreateInfo {
-					s_type: VkStructureType::BufferCreateInfo,
-					next: null(),
-					flags: 0,
-					size, // size in Bytes
-					usage: VkBufferUsage::VertexBufferBit,
-					sharing_mode: VkSharingMode::Exclusive,
-					queue_family_index_count: 0,
-					queue_family_indices: null(),
-				},
-				null(),
-				&mut vertex_input_buffer
-			).unwrap();
-
-			// Allocate memory for vertex buffer.
-			(vulkan.0.data().get_bufmemreq)(
-				vulkan.0.data().device,
-				vertex_input_buffer,
-				&mut vb_memreqs,
-			);
-
-			(vulkan.0.data().mem_allocate)(
-				vulkan.0.data().device,
-				&VkMemoryAllocateInfo {
-					s_type: VkStructureType::MemoryAllocateInfo,
-					next: null(),
-					allocation_size: vb_memreqs.size,
-					memory_type_index: get_memory_type(
-						vulkan,
-						vb_memreqs.memory_type_bits,
-						VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ),
-				},
-				null(),
-				&mut vertex_buffer_memory,
-			).unwrap();
-
-			// Copy buffer data.
-			let mut mapped = mem::uninitialized();
-
-			(vulkan.0.data().mapmem)(
-				vulkan.0.data().device,
-				vertex_buffer_memory,
-				0,
-				size,
-				0,
-				&mut mapped
-			).unwrap();
-
-			ptr::copy_nonoverlapping(vertices.as_ptr(),
-				mapped as *mut f32, vertices.len());
-
-			(vulkan.0.data().unmap)(vulkan.0.data().device,
-				vertex_buffer_memory);
-
-			(vulkan.0.data().bind_buffer_mem)(
-				vulkan.0.data().device,
-				vertex_input_buffer,
-				vertex_buffer_memory,
-				0
-			).unwrap();
-
-			// Add buffer
-			Shape { buffers: (vertex_input_buffer, vertex_buffer_memory) }
-		} // end unsafe
-	}
-}*/
 
 pub unsafe fn new_buffer(vulkan: &mut Vk, vertices: &[f32]) -> Buffer {
 	Buffer::new(vulkan, vertices, BufferBuilderType::Vertex)
@@ -1402,17 +1283,4 @@ impl Drop for ShaderModule {
 			(self.2)(self.1, self.0, null());
 		}
 	}
-}
-
-pub unsafe fn destroy_uniforms(connection: &mut Vk,
-	device: VkDevice, _/*uniform_memory*/: VkDeviceMemory,
-	desc_set: VkDescriptorSet, desc_pool: VkDescriptorPool,
-	_/*uniform_buffer*/: VkBuffer) -> ()
-{
-	let connection = connection.0.data();
-
-//	(connection.drop_memory)(device, uniform_memory, null());
-	(connection.drop_descsets)(device, desc_pool, 1, &desc_set).unwrap();
-	(connection.drop_descpool)(device, desc_pool, null());
-//	(connection.drop_buffer)(device, uniform_buffer, null());
 }

@@ -1,48 +1,14 @@
-// Aldaron's System Interface / Vulkan
-// Copyright (c) 2017-2018 Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>
-// Licensed under the MIT LICENSE
-//
-// src/surface.rs
+// "asi_vulkan" crate - Licensed under the MIT LICENSE
+//  * Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
 
 // TODO: Make surface a buffer and blit onto screen with window manager.
 
 use std::{ mem, ptr::{ null_mut } };
 use libc::c_void;
-// use ami::Child;
 
 use vulkan;
 use types::*;
 use Vk;
-//use VkObject;
-//use VkType;
-
-/*pub struct Surface(pub(crate)Child<Vulkan, VkObject>);
-
-impl Surface {
-	/// Create a new surface on a Windows Window
-	pub fn new_windows(vulkan: &mut Vk, connection: *mut c_void,
-		window: *mut c_void) -> Self
-	{
-		let c = vulkan.0.data();
-
-		Surface(Child::new(&vulkan.0, VkObject::new(VkType::Surface,
-			new_surface_windows(c, connection, window), 0)))
-	}
-
-	/// Create a new surface on an XCB Window
-	pub fn new_xcb(vulkan: &mut Vk, connection: *mut c_void,
-		window: u32) -> Self
-	{
-		let c = vulkan.0.data();
-
-		Surface(Child::new(&vulkan.0, VkObject::new(VkType::Surface,
-			new_surface_xcb(c, connection, window), 0)))
-	}
-
-	pub(crate) fn surface(&self) -> u64 {
-		self.0.data().surface()
-	}
-}*/
 
 #[cfg(unix)] #[repr(C)]
 struct SurfaceCreateInfoXcb {

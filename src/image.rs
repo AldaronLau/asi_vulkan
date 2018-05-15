@@ -1,8 +1,5 @@
-// Aldaron's System Interface / Vulkan
-// Copyright (c) 2017 Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>
-// Licensed under the MIT LICENSE
-//
-// src/image.rs
+// "asi_vulkan" crate - Licensed under the MIT LICENSE
+//  * Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
 
 use std::mem;
 use std::ptr::{ null };
@@ -25,13 +22,6 @@ impl Image {
 		initial_layout: VkImageLayout, reqs_mask: VkFlags,
 		samples: VkSampleCount) -> Image
 	{ unsafe {
-//		let c = vulkan.0.data();
-
-//		let drop_image
-//			= vulkan::dsym(vulkan.0.data(), device, b"vkDestroyImage\0");
-//		let drop_memory =
-//			vulkan::dsym(vulkan.0.data(), device, b"vkFreeMemory\0");
-
 		let mut image = mem::uninitialized();
 		let mut image_memory = mem::uninitialized();
 		let mut memory_reqs = mem::uninitialized();

@@ -1,8 +1,5 @@
-// Aldaron's System Interface / Vulkan
-// Copyright (c) 2018 Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>
-// Licensed under the MIT LICENSE
-//
-// src/style.rs
+// "asi_vulkan" crate - Licensed under the MIT LICENSE
+//  * Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
 
 use ami::Child;
 use null;
@@ -17,10 +14,6 @@ use VkType;
 use VkObject;
 
 pub struct Style(Child<Vulkan, VkObject>);
-
-//	pub pipeline: VkPipeline,
-//	pub pipeline_layout: VkPipelineLayout,
-//	pub descsetlayout: VkDescriptorSetLayout,
 
 impl Style {
 	pub fn new(connection: &mut Vk, render_pass: VkRenderPass, width: u32,

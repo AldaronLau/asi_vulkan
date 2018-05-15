@@ -1,8 +1,5 @@
-// Aldaron's System Interface / Vulkan
-// Copyright (c) 2017-2018 Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>
-// Licensed under the MIT LICENSE
-//
-// src/memory/buffer.rs
+// "asi_vulkan" crate - Licensed under the MIT LICENSE
+//  * Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
 
 use null;
 use std::{ mem, ptr };

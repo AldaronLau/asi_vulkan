@@ -1,8 +1,5 @@
-// Aldaron's System Interface / Vulkan
-// Copyright (c) 2018 Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>
-// Licensed under the MIT LICENSE
-//
-// src/sprite.rs
+// "asi_vulkan" crate - Licensed under the MIT LICENSE
+//  * Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
 
 use null;
 use mem;
@@ -102,7 +99,6 @@ impl Sprite {
 		let uniform_memory = Buffer::new(vulkan, &[buffer_data],
 			BufferBuilderType::Uniform);
 
-	// }
 		let device = vulkan.0.data().device;
 
 		txuniform(vulkan, device, desc_set, tex_count, texture,
@@ -168,12 +164,6 @@ impl DescriptorSetWriter {
 			memory.buffer());
 
 		self.nwrites += 1;
-
-		/*for i in 0..self.nwrites {
-			unsafe {
-				println!("{:x}", (*self.writes[i as usize].buffer_info).buffer.0);
-			}
-		}*/
 
 		self
 	}

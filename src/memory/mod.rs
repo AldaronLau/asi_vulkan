@@ -1,8 +1,5 @@
-// Aldaron's System Interface / Vulkan
-// Copyright (c) 2017-2018 Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>
-// Licensed under the MIT LICENSE
-//
-// src/memory/mod.rs
+// "asi_vulkan" crate - Licensed under the MIT LICENSE
+//  * Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
 
 use Vk;
 
@@ -11,6 +8,7 @@ mod buffer;
 pub use self::buffer::{ Buffer, BufferBuilderType };
 pub(crate) use self::buffer::destroy;
 
+// TODO: is needed?  Probably just use buffer instead.
 pub struct Memory<T> where T: Clone {
 	pub data: T,
 	pub buffer: buffer::Buffer,
@@ -25,45 +23,6 @@ impl<T> Memory<T> where T: Clone {
 		let buffer = buffer::Buffer::new(vulkan,
 			&[data.clone()],
 			buffer::BufferBuilderType::Uniform);
-/*		let mut memory = unsafe { mem::uninitialized() };
-		let mem_reqs = buffer.get_reqs(vulkan.0.data());
-		unsafe {
-			(vulkan.0.data().mem_allocate)(
-				vulkan.0.data().device,
-				&VkMemoryAllocateInfo {
-					s_type: VkStructureType::MemoryAllocateInfo,
-					next: ptr::null(),
-					allocation_size: mem_reqs.size,
-					memory_type_index: super::get_memory_type(
-						vulkan,
-						mem_reqs.memory_type_bits,
-						VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-						VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
-				},
-				ptr::null(),
-				&mut memory
-			).unwrap();
-		}
-		let dropfn = unsafe {
-			vulkan::dsym(vulkan.0.data(), b"vkFreeMemory\0")
-		};
-
-		unsafe {
-			(vulkan.0.data().bind_buffer_mem)(
-				vulkan.0.data().device,
-				buffer.buffer().0,
-				memory,
-				0
-			).unwrap();
-		}
-
-		let device = vulkan.0.data().device;
-
-		let memory = Memory { data, memory, buffer, device, dropfn };
-
-		memory.update(vulkan);
-
-		memory*/
 
 		Memory { data: data.clone(), buffer }
 	}

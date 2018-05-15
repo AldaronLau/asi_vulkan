@@ -1,8 +1,5 @@
-// Aldaron's System Interface / Vulkan
-// Copyright (c) 2017-2018 Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>
-// Licensed under the MIT LICENSE
-//
-// src/renderer/ffi/vulkan/ffi/types.rs
+// "asi_vulkan" crate - Licensed under the MIT LICENSE
+//  * Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
 
 use std::fmt;
 use libc::c_void;
@@ -25,23 +22,11 @@ pub type VkPipelineLayout = u64;
 pub type VkImageView = u64;
 pub type VkBuffer = u64;
 pub type VkFence = u64;
-// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSurfaceKHR(pub(crate) u64);
-// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDeviceMemory(pub(crate) u64);
-// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkImage(pub(crate) u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSwapchainKHR(pub(crate) u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkRenderPass(pub(crate) u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkFramebuffer(pub(crate) u64);
-// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkFence(pub(crate) u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSemaphore(pub(crate)  u64);
-// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkImageView(pub(crate) u64);
-// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkBuffer(pub(crate)  u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkShaderModule(pub(crate) u64);
-// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipeline(pub(crate) u64);
-// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorSetLayout(pub(crate) u64);
-// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipelineLayout(pub(crate) u64);
-// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSampler(pub(crate) u64);
-// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorSet(pub(crate) u64);
-// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorPool(pub(crate) u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipelineCache(pub(crate) u64);
 
 // Dispatchable Handles
@@ -49,7 +34,6 @@ pub type VkCommandBuffer = *mut c_void;
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDevice(*mut c_void);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPhysicalDevice(*mut c_void);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkInstance(*mut c_void);
-// #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkCommandBuffer(*mut c_void);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkQueue(*mut c_void);
 
 #[repr(C)] pub struct VkRenderPassBeginInfo {
