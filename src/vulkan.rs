@@ -229,6 +229,8 @@ pub struct Vulkan {
 		*const c_void) -> (),
 	pub(crate) drop_image: unsafe extern "system" fn(VkDevice, VkImage, *const c_void)
 		-> (),
+	pub(crate) drop_buffer: unsafe extern "system" fn(VkDevice, VkBuffer,
+		*const c_void) -> (),
 	pub(crate) drop_memory: unsafe extern "system" fn(VkDevice,
 		VkDeviceMemory, *const c_void) -> (),
 	pub(crate) drop_swapchain: unsafe extern "system" fn(VkDevice, VkSwapchainKHR,
@@ -364,6 +366,7 @@ impl Vulkan {
 			drop_imgview: vk_sym(vk, vksym, b"vkDestroyImageView\0"),
 			drop_renderpass: vk_sym(vk, vksym, b"vkDestroyRenderPass\0"),
 			drop_image: vk_sym(vk, vksym, b"vkDestroyImage\0"),
+			drop_buffer: vk_sym(vk, vksym, b"vkDestroyBuffer\0"),
 			drop_memory: vk_sym(vk, vksym, b"vkFreeMemory\0\0"),
 			drop_swapchain: vk_sym(vk, vksym, b"vkDestroySwapchainKHR\0"),
 			update_descsets: vk_sym(vk, vksym, b"vkUpdateDescriptorSets\0"),
@@ -416,6 +419,7 @@ pub enum VkType {
 	Image,
 	Sprite,
 	Style,
+	Buffer,
 }
 
 pub struct VkObject {
@@ -449,6 +453,7 @@ impl ::ami::PseudoDrop for VkObject {
 			Image => ::image::destroy(self.style(), vulkan),
 			Sprite => ::sprite::destroy(self.image(), vulkan),
 			Style => ::style::destroy(self.style(), vulkan),
+			Buffer => ::memory::destroy(self.image(), vulkan),
 		}
 	}
 }

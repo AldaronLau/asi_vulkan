@@ -27,7 +27,7 @@ use std::ptr;
 use libc::c_void;
 
 // Export Types
-pub use self::memory::Memory;
+pub use self::memory::{ Memory, Buffer, BufferBuilderType };
 pub use self::depth_buffer::DepthBuffer;
 pub use self::image::Image;
 pub use self::surface::{ new_surface_xcb, new_surface_windows };
@@ -1297,9 +1297,10 @@ pub unsafe fn vw_camera_new(connection: &mut Vk,
 	(ucamera_memory, ueffect_memory)
 }
 
+/*
 /// A render-able shape made of triangle strips.
 pub struct Shape {
-	pub buffers: (VkBuffer, VkDeviceMemory),
+	buffers: (VkBuffer, VkDeviceMemory),
 }
 
 impl Shape {
@@ -1384,84 +1385,10 @@ impl Shape {
 			Shape { buffers: (vertex_input_buffer, vertex_buffer_memory) }
 		} // end unsafe
 	}
-}
+}*/
 
-pub unsafe fn new_buffer(vulkan: &mut Vk, vertices: &[f32])
-	-> (VkBuffer, VkDeviceMemory)
-{
-//	let connection = vulkan.0.data();
-
-	let size = (mem::size_of::<f32>() * vertices.len()) as u64;
-
-	let mut vertex_input_buffer = mem::uninitialized();
-	let mut vertex_buffer_memory = mem::uninitialized();
-	let mut vb_memreqs = mem::uninitialized();
-
-	// Create Vertex Buffer
-	// TODO: Use `Buffer` Type
-	(vulkan.0.data().new_buffer)(
-		vulkan.0.data().device,
-		&VkBufferCreateInfo {
-			s_type: VkStructureType::BufferCreateInfo,
-			next: null(),
-			flags: 0,
-			size: size, // size in Bytes
-			usage: VkBufferUsage::VertexBufferBit,
-			sharing_mode: VkSharingMode::Exclusive,
-			queue_family_index_count: 0,
-			queue_family_indices: null(),
-		},
-		null(),
-		&mut vertex_input_buffer
-	).unwrap();
-
-	// Allocate memory for vertex buffer.
-	(vulkan.0.data().get_bufmemreq)(
-		vulkan.0.data().device,
-		vertex_input_buffer,
-		&mut vb_memreqs,
-	);
-
-	(vulkan.0.data().mem_allocate)(
-		vulkan.0.data().device,
-		&VkMemoryAllocateInfo {
-			s_type: VkStructureType::MemoryAllocateInfo,
-			next: null(),
-			allocation_size: vb_memreqs.size,
-			memory_type_index: get_memory_type(
-				vulkan,
-				vb_memreqs.memory_type_bits,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ),
-		},
-		null(),
-		&mut vertex_buffer_memory,
-	).unwrap();
-
-	
-	// Copy buffer data.
-	let mut mapped = mem::uninitialized();
-
-	(vulkan.0.data().mapmem)(
-		vulkan.0.data().device,
-		vertex_buffer_memory,
-		0,
-		size,
-		0,
-		&mut mapped as *mut *mut _ as *mut *mut c_void
-	).unwrap();
-
-	ptr::copy_nonoverlapping(vertices.as_ptr(), mapped, vertices.len());
-
-	(vulkan.0.data().unmap)(vulkan.0.data().device, vertex_buffer_memory);
-
-	(vulkan.0.data().bind_buffer_mem)(
-		vulkan.0.data().device,
-		vertex_input_buffer,
-		vertex_buffer_memory,
-		0
-	).unwrap();
-
-	(vertex_input_buffer, vertex_buffer_memory)
+pub unsafe fn new_buffer(vulkan: &mut Vk, vertices: &[f32]) -> Buffer {
+	Buffer::new(vulkan, vertices, BufferBuilderType::Vertex)
 }
 
 pub struct ShaderModule(

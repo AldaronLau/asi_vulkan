@@ -12,7 +12,7 @@ use types::*;
 use FogUniform;
 use TransformUniform;
 use Style;
-use Memory;
+use memory::{ Buffer, BufferBuilderType, Memory };
 use Vk;
 use Vulkan;
 use VkObject;
@@ -22,8 +22,7 @@ use Image;
 /// A render-able instance.
 pub struct Sprite {
 	// TODO: pub's?
-	pub matrix_buffer: VkBuffer,
-	pub uniform_memory: VkDeviceMemory,
+	pub uniform_memory: Buffer,
 	pub desc_set: Child<Vulkan, VkObject>,
 	pub pipeline: VkPipeline,
 	pub pipeline_layout: VkPipelineLayout,
@@ -99,7 +98,8 @@ impl Sprite {
 		).unwrap();
 
 		// Allocate memory for uniform buffer.
-		let uniform_memory = Memory::new(vulkan, buffer_data);
+		let uniform_memory = Buffer::new(vulkan, &[buffer_data],
+			BufferBuilderType::Uniform);
 
 	// }
 		let device = vulkan.0.data().device;
@@ -110,8 +110,7 @@ impl Sprite {
 		println!("NEW: Drop Desc Pool & Attached Sets");
 
 		Sprite {
-			matrix_buffer: uniform_memory.buffer.buffer,
-			uniform_memory: uniform_memory.memory,
+			uniform_memory: uniform_memory,
 			desc_set: Child::new(&vulkan.0, VkObject::new(
 				VkType::Sprite, desc_set, desc_pool, 0)),
 			pipeline: pipeline.style().0/*pipeline*/,
@@ -124,15 +123,15 @@ impl Sprite {
 	}
 }
 
-unsafe fn txuniform<T>(vulkan: &mut Vk, device: VkDevice,
+unsafe fn txuniform(vulkan: &mut Vk, device: VkDevice,
 	desc_set: VkDescriptorSet, hastex: bool, texture: &Image,
-	matrix_memory: &Memory<T>, camera_memory: &Memory<TransformUniform>,
-	effect_memory: &Memory<FogUniform>) where T: Clone
+	matrix_memory: &Buffer, camera_memory: &Memory<TransformUniform>,
+	effect_memory: &Memory<FogUniform>)
 {
 	let mut writer = DescriptorSetWriter::new()
 		.uniform(desc_set, matrix_memory)
-		.uniform(desc_set, camera_memory)
-		.uniform(desc_set, effect_memory);
+		.uniform(desc_set, &camera_memory.buffer)
+		.uniform(desc_set, &effect_memory.buffer);
 
 	if hastex {
 		writer = writer.sampler(desc_set, vulkan.0.data().sampler,
@@ -159,11 +158,11 @@ impl DescriptorSetWriter {
 
 	/// Write a uniform buffer to the descriptor set.
 	#[inline(always)]
-	pub fn uniform<T>(mut self, desc_set: VkDescriptorSet,
-		memory: &Memory<T>) -> Self
-		where T: Clone
+	pub fn uniform(mut self, desc_set: VkDescriptorSet, memory: &Buffer)
+		-> Self
 	{
-		self.sets[self.nwrites as usize] = Set::Uniform(desc_set, memory.buffer.buffer);
+		self.sets[self.nwrites as usize] = Set::Uniform(desc_set,
+			memory.buffer());
 
 		self.nwrites += 1;
 
