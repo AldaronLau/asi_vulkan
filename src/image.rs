@@ -116,6 +116,4 @@ impl Image {
 		(c.drop_memory)(c.device, image.1, null());
 		(c.drop_imgview)(c.device, image.2, null());
 	}
-
-	println!("TEST: Drop Image");
 }

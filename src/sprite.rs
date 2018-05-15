@@ -37,14 +37,10 @@ impl Sprite {
 		texture: Option<&Image>, tex_count: bool)
 		 -> Self where T: Clone
 	{
-		println!("Ni s");
-
 	//	let connection = vulkan.0.data();
 
 		let mut desc_pool = mem::uninitialized();
 		let mut desc_set = mem::uninitialized();
-
-		println!("Descriptor Pool");
 
 		// Descriptor Pool
 		(vulkan.0.data().new_descpool)(
@@ -90,8 +86,6 @@ impl Sprite {
 			&mut desc_pool
 		).unwrap();
 
-		println!("New Descsets");
-
 		(vulkan.0.data().new_descsets)(
 			vulkan.0.data().device,
 			&VkDescriptorSetAllocateInfo {
@@ -104,8 +98,6 @@ impl Sprite {
 			&mut desc_set
 		).unwrap();
 
-		println!("Uniform Memory");
-
 		// Allocate memory for uniform buffer.
 		let uniform_memory = Buffer::new(vulkan, &[buffer_data],
 			BufferBuilderType::Uniform);
@@ -113,12 +105,8 @@ impl Sprite {
 	// }
 		let device = vulkan.0.data().device;
 
-		println!("TXU");
-
 		txuniform(vulkan, device, desc_set, tex_count, texture,
 			&uniform_memory, camera_memory, effect_memory);
-
-		println!("NEW: Drop Desc Pool & Attached Sets");
 
 		Sprite {
 			uniform_memory: uniform_memory,
@@ -195,8 +183,6 @@ impl DescriptorSetWriter {
 	pub fn sampler(mut self, desc_set: VkDescriptorSet,
 		tex_sampler: VkSampler, tex_view: VkImageView) -> Self
 	{
-		println!("sampler: {:x}", tex_view);
-
 		self.sets[self.nwrites as usize] = Set::Sampler(desc_set, tex_sampler, tex_view);
 
 		self.nwrites += 1;

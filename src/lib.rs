@@ -23,7 +23,6 @@ mod fence;
 //
 use std::{ mem, u64 };
 use std::ptr::{ null, null_mut };
-use std::ptr;
 use libc::c_void;
 
 // Export Types

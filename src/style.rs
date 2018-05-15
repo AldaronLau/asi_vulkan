@@ -332,6 +332,4 @@ pub fn new_pipeline(vulkan: &mut Vk, render_pass: VkRenderPass, width: u32,
 		(c.drop_pipeline_layout)(c.device, style.1, null());
 		(c.drop_descset_layout)(c.device, style.2, null());
 	}
-
-	println!("TEST: Drop Style");
 }

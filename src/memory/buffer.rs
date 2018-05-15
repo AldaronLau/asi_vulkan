@@ -11,7 +11,6 @@ use ami::Child;
 
 use VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 use VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-use vulkan;
 use Vulkan;
 use Vk;
 use VkObject;
@@ -91,7 +90,7 @@ impl Buffer {
 			).unwrap();
 		}
 
-		let mut buffer = Buffer(Child::new(&vulkan.0, VkObject::new(
+		let buffer = Buffer(Child::new(&vulkan.0, VkObject::new(
 			VkType::Buffer, buffer, memory, 0)));
 
 		buffer.update(data, vulkan);
