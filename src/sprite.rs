@@ -18,9 +18,9 @@ use Image;
 
 /// A render-able instance.
 pub struct Sprite {
+	pub(crate) desc_set: Child<Vulkan, VkObject>,
 	// TODO: pub's?
 	pub uniform_memory: Buffer,
-	pub desc_set: Child<Vulkan, VkObject>,
 	pub pipeline: VkPipeline,
 	pub pipeline_layout: VkPipelineLayout,
 }
