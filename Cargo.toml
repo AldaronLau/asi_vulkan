@@ -13,7 +13,7 @@
 
 [package]
 name = "asi_vulkan"
-version = "0.4.0"
+version = "0.5.0"
 authors = [
 	"Jeron A. Lau <jeron.lau@plopgrizzly.com>"
 ]
@@ -23,7 +23,7 @@ documentation = "https://docs.rs/asi_vulkan"
 homepage = "http://plopgrizzly.com/asi_vulkan"
 repository = "https://github.com/plopgrizzly/asi_vulkan"
 
-readme = "README.md"
+readme = "readme.md"
 description = """
     Aldaron's System Interface / Vulkan is a library developed by Plop Grizzly
     for interfacing with the Vulkan library.
@@ -33,12 +33,12 @@ categories = ["rendering::graphics-api", "hardware-support",
 	"api-bindings", "rendering", "external-ffi-bindings"]
 
 exclude = [
-	"examples/*", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", ".gitignore",
-	"_config.yml", "ISSUE_TEMPLATE.md"
+	"examples/*", "code_of_conduct.md", "contributing.md", ".gitignore",
+	"_config.yml", "issue_template.md"
 ]
 
 [dependencies]
-ami = "^0.7"
+ami = "^0.8"
 libc = "^0.2"
 
 [features]
