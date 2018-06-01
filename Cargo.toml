@@ -40,6 +40,7 @@ exclude = [
 [dependencies]
 ami = "^0.8"
 libc = "^0.2"
+dl_api = { path = "../../Downloads/rust-dlopen" }
 
 [features]
 default = [] # ["checks"] # Un-comment for validation layers.

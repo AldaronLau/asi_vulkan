@@ -1072,7 +1072,7 @@ pub enum VkPresentModeKHR {
 	SrgbNonlinearKhr = 0,
 }
 
-#[repr(C)] #[allow(dead_code)] #[derive(PartialEq, Clone)] pub enum VkFormat {
+#[repr(C)] #[allow(dead_code)] #[derive(PartialEq, Clone, Debug)] pub enum VkFormat {
 	Undefined = 0,
 	R4g4UnormPack8 = 1,
 	R4g4b4a4UnormPack16 = 2,

@@ -4,65 +4,28 @@
 use ami::Parent;
 use { std, std::{ mem, ptr::{ null, null_mut }, ffi::CString } };
 
-use libc;
 use libc::c_void;
 
 use types::*;
 
-// TODO: move to asi
+// Windows
 #[cfg(target_os = "windows")]
-extern "system" {
-	fn LoadLibraryW(a: *const u16) -> *mut c_void /*HMODULE*/;
-	fn GetProcAddress(b: *mut c_void/*HMODULE*/, c: *const u8)
-		-> *mut c_void;
-	fn FreeLibrary(a: *mut c_void/*HMODULE*/) -> i32 /*BOOL*/;
-}
+const DL: &'static str = "vulkan-1.dll";
 
-// TODO: move to asi ...
-#[cfg(target_os = "windows")]
-unsafe fn load_lib() -> *mut c_void {
-//	let vulkan = if cfg!(target_pointer_width = "64") {
-//		"C:\\Windows\\SysWOW64\\vulkan-1.dll";
-//	} else {
-//		"C:\\Windows\\System32\\vulkan-1.dll";
-//	}
-	let vulkan = "vulkan-1.dll\0";
-	let vulkan16 : Vec<u16> = vulkan.encode_utf16().collect();
-	let handle = LoadLibraryW(vulkan16.as_ptr());
-	
-	if handle.is_null() {
-		panic!("failed to load vulkan-1.dll")
-	} else {
-		handle
-	}
-}
+// Unix (Except MacOS)
+#[cfg(all(unix, not(target_os = "macos")))]
+const DL: &'static str = "libvulkan.so.1";
 
-#[cfg(not(target_os = "windows"))]
-unsafe fn load_lib() -> *mut c_void {
-	let vulkan = b"libvulkan.so.1\0";
-
-	libc::dlopen(&vulkan[0] as *const _ as *const i8, 1)
-}
-
-#[cfg(target_os = "windows")]
-unsafe fn dl_sym<T>(lib: *mut c_void, name: &[u8]) -> T {
-	let fn_ptr = GetProcAddress(lib, &name[0]);
-
-	mem::transmute_copy::<*mut c_void, T>(&fn_ptr)
-}
-
-#[cfg(not(target_os = "windows"))]
-unsafe fn dl_sym<T>(lib: *mut c_void, name: &[u8]) -> T {
-	let fn_ptr = libc::dlsym(lib, &name[0] as *const _ as *const i8);
-
-	mem::transmute_copy::<*mut c_void, T>(&fn_ptr)
-}
+// MacOS
+#[cfg(target_os = "macos")]
+const DL: &'static str = "libMoltenVK.dylib";
 
 #[inline(always)]
-pub(crate) unsafe fn vk_sym<T>(vk: VkInstance, vksym: unsafe extern "system" fn(
-	VkInstance, *const i8) -> *mut c_void, name: &[u8]) -> T
+pub(crate) unsafe fn vk_sym<T>(vk: VkInstance, lib: &VulkanApi, name: &[u8])
+	-> T
 {
-	let fn_ptr = vksym(vk, &name[0] as *const _ as *const i8);
+	let fn_ptr = (lib.vkGetInstanceProcAddr)(vk,
+		&name[0] as *const _ as *const i8);
 
 	if fn_ptr.is_null() {
 		panic!("couldn't load symbol {}!", std::str::from_utf8(name)
@@ -86,7 +49,7 @@ unsafe fn vkd_sym<T>(device: VkDevice, vkdsym: unsafe extern "system" fn(
 }
 
 pub(crate) unsafe fn sym<T>(connection: &Vulkan, name: &[u8]) -> T {
-	vk_sym(connection.vk, connection.vksym, name)
+	vk_sym(connection.vk, &connection.api, name)
 }
 
 pub(crate) unsafe fn dsym<T>(connection: &Vulkan, name: &[u8]) -> T {
@@ -157,6 +120,10 @@ unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
 	instance
 }
 
+dl_api!(VulkanApi, DL,
+	fn vkGetInstanceProcAddr(VkInstance, *const i8) -> *mut c_void
+);
+
 /// The Vulkan context.
 pub struct Vulkan {
 	pub(crate) vk: VkInstance,
@@ -168,8 +135,7 @@ pub struct Vulkan {
 	pub(crate) command_buffer: VkCommandBuffer,
 	pub(crate) command_pool: u64,
 	pub(crate) sampler: VkSampler,
-	pub(crate) lib: *mut c_void,
-	pub(crate) vksym: unsafe extern "system" fn(VkInstance, *const i8) -> *mut c_void,
+	pub(crate) api: VulkanApi,
 	pub(crate) vkdsym: unsafe extern "system" fn(VkDevice, *const i8) -> *mut c_void,
 	pub(crate) mapmem: unsafe extern "system" fn(VkDevice, VkDeviceMemory,
 		VkDeviceSize, VkDeviceSize, VkFlags, *mut *mut c_void)
@@ -312,20 +278,19 @@ pub struct Vulkan {
 
 impl Vulkan {
 	pub unsafe fn new() -> Option<Vulkan> {
-		let lib = load_lib();
+		// Load the Vulkan library
+		let api = if let Ok(lib) = VulkanApi::new() {
+			lib
+		} else {
+			return None; // Vulkan doesn't exist
+		};
 
-		if lib.is_null() {
-			return None; // Vulkan doesn't exist.
-		}
-
-		let vksym = dl_sym(lib, b"vkGetInstanceProcAddr\0");
-	
 		let vk = create_instance(
-			vk_sym(mem::zeroed(), vksym, b"vkCreateInstance\0")
+			vk_sym(mem::zeroed(), &api, b"vkCreateInstance\0")
 		);
 
 		Some(Vulkan {
-			vk, lib, vksym,
+			vk,
 			// Late inits.
 			surface: ::std::mem::uninitialized(),
 			gpu: ::std::mem::uninitialized(),
@@ -335,78 +300,79 @@ impl Vulkan {
 			command_buffer: ::std::mem::uninitialized(),
 			command_pool: ::std::mem::uninitialized(),
 			sampler: ::std::mem::uninitialized(),
-			vkdsym: vk_sym(vk, vksym, b"vkGetDeviceProcAddr\0"),
-			mapmem: vk_sym(vk, vksym, b"vkMapMemory\0"),
-			draw: vk_sym(vk, vksym, b"vkCmdDraw\0"),
-			unmap: vk_sym(vk, vksym, b"vkUnmapMemory\0"),
-			new_swapchain: vk_sym(vk, vksym, b"vkCreateSwapchainKHR\0"),
-			get_swapcount: vk_sym(vk, vksym, b"vkGetSwapchainImagesKHR\0"),
-			create_fence: vk_sym(vk, vksym, b"vkCreateFence\0"),
-			begin_cmdbuff: vk_sym(vk, vksym, b"vkBeginCommandBuffer\0"),
-			pipeline_barrier: vk_sym(vk, vksym, b"vkCmdPipelineBarrier\0"),
-			end_cmdbuff: vk_sym(vk, vksym, b"vkEndCommandBuffer\0"),
-			queue_submit: vk_sym(vk, vksym, b"vkQueueSubmit\0"),
-			wait_fence: vk_sym(vk, vksym, b"vkWaitForFences\0"),
-			reset_fence: vk_sym(vk, vksym, b"vkResetFences\0"),
-			reset_cmdbuff: vk_sym(vk, vksym, b"vkResetCommandBuffer\0"),
-			create_imgview: vk_sym(vk, vksym, b"vkCreateImageView\0"),
-			get_memprops: vk_sym(vk, vksym,
+			vkdsym: vk_sym(vk, &api, b"vkGetDeviceProcAddr\0"),
+			mapmem: vk_sym(vk, &api, b"vkMapMemory\0"),
+			draw: vk_sym(vk, &api, b"vkCmdDraw\0"),
+			unmap: vk_sym(vk, &api, b"vkUnmapMemory\0"),
+			new_swapchain: vk_sym(vk, &api, b"vkCreateSwapchainKHR\0"),
+			get_swapcount: vk_sym(vk, &api, b"vkGetSwapchainImagesKHR\0"),
+			create_fence: vk_sym(vk, &api, b"vkCreateFence\0"),
+			begin_cmdbuff: vk_sym(vk, &api, b"vkBeginCommandBuffer\0"),
+			pipeline_barrier: vk_sym(vk, &api, b"vkCmdPipelineBarrier\0"),
+			end_cmdbuff: vk_sym(vk, &api, b"vkEndCommandBuffer\0"),
+			queue_submit: vk_sym(vk, &api, b"vkQueueSubmit\0"),
+			wait_fence: vk_sym(vk, &api, b"vkWaitForFences\0"),
+			reset_fence: vk_sym(vk, &api, b"vkResetFences\0"),
+			reset_cmdbuff: vk_sym(vk, &api, b"vkResetCommandBuffer\0"),
+			create_imgview: vk_sym(vk, &api, b"vkCreateImageView\0"),
+			get_memprops: vk_sym(vk, &api,
 				b"vkGetPhysicalDeviceMemoryProperties\0"),
-			create_image: vk_sym(vk, vksym, b"vkCreateImage\0"),
-			get_imgmemreq: vk_sym(vk, vksym,
+			create_image: vk_sym(vk, &api, b"vkCreateImage\0"),
+			get_imgmemreq: vk_sym(vk, &api,
 				b"vkGetImageMemoryRequirements\0"),
-			mem_allocate: vk_sym(vk, vksym, b"vkAllocateMemory\0"),
-			bind_imgmem: vk_sym(vk, vksym, b"vkBindImageMemory\0"),
-			new_renderpass: vk_sym(vk, vksym, b"vkCreateRenderPass\0"),
-			create_framebuffer: vk_sym(vk, vksym, b"vkCreateFramebuffer\0"),
-			drop_framebuffer: vk_sym(vk, vksym, b"vkDestroyFramebuffer\0"),
-			drop_imgview: vk_sym(vk, vksym, b"vkDestroyImageView\0"),
-			drop_renderpass: vk_sym(vk, vksym, b"vkDestroyRenderPass\0"),
-			drop_image: vk_sym(vk, vksym, b"vkDestroyImage\0"),
-			drop_buffer: vk_sym(vk, vksym, b"vkDestroyBuffer\0"),
-			drop_memory: vk_sym(vk, vksym, b"vkFreeMemory\0\0"),
-			drop_swapchain: vk_sym(vk, vksym, b"vkDestroySwapchainKHR\0"),
-			update_descsets: vk_sym(vk, vksym, b"vkUpdateDescriptorSets\0"),
-			drop_descpool: vk_sym(vk, vksym, b"vkDestroyDescriptorPool\0"),
-			bind_buffer_mem: vk_sym(vk, vksym, b"vkBindBufferMemory\0"),
-			get_bufmemreq: vk_sym(vk, vksym,
+			mem_allocate: vk_sym(vk, &api, b"vkAllocateMemory\0"),
+			bind_imgmem: vk_sym(vk, &api, b"vkBindImageMemory\0"),
+			new_renderpass: vk_sym(vk, &api, b"vkCreateRenderPass\0"),
+			create_framebuffer: vk_sym(vk, &api, b"vkCreateFramebuffer\0"),
+			drop_framebuffer: vk_sym(vk, &api, b"vkDestroyFramebuffer\0"),
+			drop_imgview: vk_sym(vk, &api, b"vkDestroyImageView\0"),
+			drop_renderpass: vk_sym(vk, &api, b"vkDestroyRenderPass\0"),
+			drop_image: vk_sym(vk, &api, b"vkDestroyImage\0"),
+			drop_buffer: vk_sym(vk, &api, b"vkDestroyBuffer\0"),
+			drop_memory: vk_sym(vk, &api, b"vkFreeMemory\0\0"),
+			drop_swapchain: vk_sym(vk, &api, b"vkDestroySwapchainKHR\0"),
+			update_descsets: vk_sym(vk, &api, b"vkUpdateDescriptorSets\0"),
+			drop_descpool: vk_sym(vk, &api, b"vkDestroyDescriptorPool\0"),
+			bind_buffer_mem: vk_sym(vk, &api, b"vkBindBufferMemory\0"),
+			get_bufmemreq: vk_sym(vk, &api,
 				b"vkGetBufferMemoryRequirements\0"),
-			new_buffer: vk_sym(vk, vksym, b"vkCreateBuffer\0"),
-			new_descpool: vk_sym(vk, vksym, b"vkCreateDescriptorPool\0"),
-			new_descsets: vk_sym(vk, vksym, b"vkAllocateDescriptorSets\0"),
-			new_shademod: vk_sym(vk, vksym, b"vkCreateShaderModule\0"),
-			drop_shademod: vk_sym(vk, vksym, b"vkDestroyShaderModule\0"),
-			new_pipeline: vk_sym(vk, vksym, b"vkCreateGraphicsPipelines\0"),
-			drop_pipeline: vk_sym(vk, vksym, b"vkDestroyPipeline\0"),
+			new_buffer: vk_sym(vk, &api, b"vkCreateBuffer\0"),
+			new_descpool: vk_sym(vk, &api, b"vkCreateDescriptorPool\0"),
+			new_descsets: vk_sym(vk, &api, b"vkAllocateDescriptorSets\0"),
+			new_shademod: vk_sym(vk, &api, b"vkCreateShaderModule\0"),
+			drop_shademod: vk_sym(vk, &api, b"vkDestroyShaderModule\0"),
+			new_pipeline: vk_sym(vk, &api, b"vkCreateGraphicsPipelines\0"),
+			drop_pipeline: vk_sym(vk, &api, b"vkDestroyPipeline\0"),
 			new_pipeline_layout:
-				vk_sym(vk, vksym, b"vkCreatePipelineLayout\0"),
-			drop_pipeline_layout: vk_sym(vk, vksym,
+				vk_sym(vk, &api, b"vkCreatePipelineLayout\0"),
+			drop_pipeline_layout: vk_sym(vk, &api,
 				b"vkDestroyPipelineLayout\0"),
 			new_descset_layout:
-				vk_sym(vk, vksym, b"vkCreateDescriptorSetLayout\0"),
-			drop_descset_layout: vk_sym(vk, vksym,
+				vk_sym(vk, &api, b"vkCreateDescriptorSetLayout\0"),
+			drop_descset_layout: vk_sym(vk, &api,
 				b"vkDestroyDescriptorSetLayout\0"),
-			bind_vb: vk_sym(vk, vksym, b"vkCmdBindVertexBuffers\0"),
-			bind_pipeline: vk_sym(vk, vksym, b"vkCmdBindPipeline\0"),
-			bind_descsets: vk_sym(vk, vksym, b"vkCmdBindDescriptorSets\0"),
-			new_semaphore: vk_sym(vk, vksym, b"vkCreateSemaphore\0"),
-			drop_semaphore: vk_sym(vk, vksym, b"vkDestroySemaphore\0"),
-			get_next_image: vk_sym(vk, vksym, b"vkAcquireNextImageKHR\0"),
-			copy_image: vk_sym(vk, vksym, b"vkCmdCopyImage\0"),
-			gpu_props: vk_sym(vk, vksym,
+			bind_vb: vk_sym(vk, &api, b"vkCmdBindVertexBuffers\0"),
+			bind_pipeline: vk_sym(vk, &api, b"vkCmdBindPipeline\0"),
+			bind_descsets: vk_sym(vk, &api, b"vkCmdBindDescriptorSets\0"),
+			new_semaphore: vk_sym(vk, &api, b"vkCreateSemaphore\0"),
+			drop_semaphore: vk_sym(vk, &api, b"vkDestroySemaphore\0"),
+			get_next_image: vk_sym(vk, &api, b"vkAcquireNextImageKHR\0"),
+			copy_image: vk_sym(vk, &api, b"vkCmdCopyImage\0"),
+			gpu_props: vk_sym(vk, &api,
 				b"vkGetPhysicalDeviceFormatProperties\0"),
 			subres_layout:
-				vk_sym(vk, vksym, b"vkGetImageSubresourceLayout\0"),
-			new_sampler: vk_sym(vk, vksym, b"vkCreateSampler\0"),
-			get_surface_capabilities: vk_sym(vk, vksym,
+				vk_sym(vk, &api, b"vkGetImageSubresourceLayout\0"),
+			new_sampler: vk_sym(vk, &api, b"vkCreateSampler\0"),
+			get_surface_capabilities: vk_sym(vk, &api,
 				b"vkGetPhysicalDeviceSurfaceCapabilitiesKHR\0"),
-			begin_render: vk_sym(vk, vksym, b"vkCmdBeginRenderPass\0"),
-			set_viewport: vk_sym(vk, vksym, b"vkCmdSetViewport\0"),
-			set_scissor: vk_sym(vk, vksym, b"vkCmdSetScissor\0"),
-			end_render_pass: vk_sym(vk, vksym, b"vkCmdEndRenderPass\0"),
-			destroy_fence: vk_sym(vk, vksym, b"vkDestroyFence\0"),
-			queue_present: vk_sym(vk, vksym, b"vkQueuePresentKHR\0"),
-			wait_idle: vk_sym(vk, vksym, b"vkDeviceWaitIdle\0"),
+			begin_render: vk_sym(vk, &api, b"vkCmdBeginRenderPass\0"),
+			set_viewport: vk_sym(vk, &api, b"vkCmdSetViewport\0"),
+			set_scissor: vk_sym(vk, &api, b"vkCmdSetScissor\0"),
+			end_render_pass: vk_sym(vk, &api, b"vkCmdEndRenderPass\0"),
+			destroy_fence: vk_sym(vk, &api, b"vkDestroyFence\0"),
+			queue_present: vk_sym(vk, &api, b"vkQueuePresentKHR\0"),
+			wait_idle: vk_sym(vk, &api, b"vkDeviceWaitIdle\0"),
+			api,
 		})
 	}
 }
@@ -533,7 +499,5 @@ impl Drop for Vulkan {
 
 		// Run Function
 		unsafe { destroy(self.vk, null_mut()) }
-		// TODO: Drop lib in asi
-		println!("FIXME: Drop dl {:?}", self.lib);
 	}
 }

@@ -3,6 +3,8 @@
 
 extern crate ami;
 extern crate libc;
+#[macro_use]
+extern crate dl_api;
 
 // Modules
 pub mod types;
@@ -675,11 +677,7 @@ pub unsafe fn get_color_format(connection: &mut Vk) -> VkFormat {
 		&mut nformats, &mut format).unwrap();
 
 	// Process data
-	if format.format == VkFormat::Undefined {
-		VkFormat::B8g8r8Unorm
-	} else {
-		format.format
-	}
+	VkFormat::B8g8r8a8Unorm
 }
 
 pub unsafe fn get_buffering(connection: &mut Vk) -> u32 {
@@ -813,7 +811,7 @@ pub unsafe fn get_present_mode(connection: &mut Vk) -> VkPresentModeKHR {
 			pre_transform: VkSurfaceTransformFlagBitsKHR::Identity,
 			composite_alpha: VkCompositeAlphaFlagBitsKHR::Opaque,
 			present_mode: present_mode,
-			clipped: 0,
+			clipped: 1/*do the clipping rendering optimization*/,
 			old_swapchain: mem::zeroed(), // vulkan->swapchain,
 			queue_family_index_count: 0,
 			p_queue_family_indices: null(),
