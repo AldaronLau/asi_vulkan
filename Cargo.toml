@@ -39,7 +39,7 @@ exclude = [
 
 [dependencies]
 ami = "0.8"
-dl_api = { path = "../../rust/dl_api" }
+dl_api = { path = "../dl_api" }
 
 [features]
 default = [] # ["checks"] # Un-comment for validation layers.
