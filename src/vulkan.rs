@@ -3,8 +3,7 @@
 
 use ami::Parent;
 use { std, std::{ mem, ptr::{ null, null_mut }, ffi::CString } };
-
-use libc::c_void;
+use c_void;
 
 use types::*;
 

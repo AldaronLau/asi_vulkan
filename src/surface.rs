@@ -3,8 +3,8 @@
 
 // TODO: Make surface a buffer and blit onto screen with window manager.
 
+use c_void;
 use std::{ mem, ptr::{ null_mut } };
-use libc::c_void;
 
 use vulkan;
 use types::*;

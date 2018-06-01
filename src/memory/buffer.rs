@@ -1,9 +1,9 @@
 // "asi_vulkan" crate - Licensed under the MIT LICENSE
 //  * Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
 
+use c_void;
 use null;
 use std::{ mem, ptr };
-use libc::c_void;
 use ami::Child;
 
 use VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;

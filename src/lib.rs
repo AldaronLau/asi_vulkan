@@ -2,7 +2,6 @@
 //  * Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
 
 extern crate ami;
-extern crate libc;
 #[macro_use]
 extern crate dl_api;
 
@@ -20,7 +19,7 @@ mod fence;
 //
 use std::{ mem, u64 };
 use std::ptr::{ null, null_mut };
-use libc::c_void;
+use std::os::raw::c_void;
 
 // Export Types
 pub use self::memory::{ Memory, Buffer, BufferBuilderType };

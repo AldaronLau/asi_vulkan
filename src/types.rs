@@ -1,8 +1,8 @@
 // "asi_vulkan" crate - Licensed under the MIT LICENSE
 //  * Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
 
+use c_void;
 use std::fmt;
-use libc::c_void;
 
 pub type VkDeviceSize = u64;
 pub type VkFlags = u32;
