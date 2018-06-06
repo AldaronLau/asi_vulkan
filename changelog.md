@@ -1,3 +1,6 @@
+## 0.7
+* Use LINEAR REPEATING for textures instead of NEAREST CLAMP
+
 ## 0.6
 * Use dl_api crate for dynamic loading.
 * Fixed platform-dependant coloration bug.
