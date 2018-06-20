@@ -13,7 +13,7 @@
 
 [package]
 name = "asi_vulkan"
-version = "0.7.0"
+version = "0.7.1"
 authors = [
 	"Jeron A. Lau <jeron.lau@plopgrizzly.com>"
 ]
@@ -38,7 +38,7 @@ exclude = [
 ]
 
 [dependencies]
-ami = "0.8"
+ami = "0.9"
 dl_api = "0.1"
 
 [features]
