@@ -1,31 +1,30 @@
-# Aldaron's System Interface / Vulkan
-
-Aldaron's System Interface / Vulkan is a library developed by Plop Grizzly
-for interfacing safely with Vulkan in Rust.
-
-[Cargo](https://crates.io/crates/asi_vulkan) /
-[Documentation](https://docs.rs/asi_vulkan) /
-[Change Log](http://plopgrizzly.com/asi_vulkan/changelog.html)
+# [Aldaron's System Interface / Vulkan](https://crates.io/crates/asi_vulkan)
+Safe inferface to Vulkan.
 
 ## Features
-**asi_vulkan**'s current features:
+* Bindings to Vulkan calls on both Unix and Windows
 * Safe bindings to some Vulkan calls
 * Unsafe bindings to some Vulkan calls
 
-**asi_vulkan**'s planned features:
+## [Contributing](http://plopgrizzly.com/contributing/en#contributing)
+
+## Roadmap to 1.0 (Future Features)
 * All bindings to Vulkan calls are safe
+* Bindings match asi_opengl
 * More bindings
+* Support Raspberry Pi Direct to display
+* Support Android
+* Support Nintendo Switch
 
-## Support
-**asi_vulkan**'s current support:
-* Unix
-* Windows
+## Change Log
+## 0.7
+* Use LINEAR REPEATING for textures instead of NEAREST CLAMP
 
-**asi_vulkan**'s planned support:
-* Raspberry Pi ("no" os)
-* Android
+## 0.6
+* Use dl_api crate for dynamic loading.
+* Fixed platform-dependant coloration bug.
 
-# Contributing
-If you'd like to help implement functions for unsupported platforms, fix bugs,
-improve the API or improve the Documentation, then contact me at
-jeron.lau@plopgrizzly.com. I'll appreciate any help.
+## 0.5
+* Uses sliced triangle fans now.
+
+## Developed by [Plop Grizzly](http://plopgrizzly.com)

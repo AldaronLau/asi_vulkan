@@ -1,5 +1,9 @@
-// "asi_vulkan" crate - Licensed under the MIT LICENSE
-//  * Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
+// "asi_vulkan" - Aldaron's System Interface - Vulkan
+//
+// Copyright Jeron A. Lau 2018.
+// Distributed under the Boost Software License, Version 1.0.
+// (See accompanying file LICENSE_1_0.txt or copy at
+// https://www.boost.org/LICENSE_1_0.txt)
 
 extern crate ami;
 #[macro_use]
@@ -1222,8 +1226,12 @@ pub unsafe fn vw_camera_new(connection: &mut Vk,
 {
 	let ucamera_memory = Memory::new(connection,
 		TransformUniform {
-			mat4: [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-				1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+			mat4: [
+				1.0, 0.0, 0.0, 0.0,
+				0.0, 1.0, 0.0, 0.0,
+				0.0, 0.0, 1.0, 0.0,
+				0.0, 0.0, 0.0, 1.0
+			],
 		}
 	);
 

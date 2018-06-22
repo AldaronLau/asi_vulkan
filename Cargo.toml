@@ -1,5 +1,4 @@
-# "asi_vulkan" crate - Licensed under the MIT LICENSE
-#  * Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
+# "asi_vulkan" - Aldaron's System Interface - Vulkan
 #                             _        _
 #                            /@\——————/@\
 # .———  .                   |   o    o   |     .————      .            .
@@ -10,35 +9,30 @@
 # |     |   ———   |       |                |    ————  |   | :——— :———  |   |
 #                 |        \              /                              __/
 #                           ¯————————————¯
+#
+# Copyright Jeron A. Lau 2018.
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_1_0.txt or copy at
+# https://www.boost.org/LICENSE_1_0.txt)
 
 [package]
 name = "asi_vulkan"
-version = "0.7.1"
+version = "0.7.2"
 authors = [
 	"Jeron A. Lau <jeron.lau@plopgrizzly.com>"
 ]
-
-license = "MIT"
+license = "BSL-1.0"
 documentation = "https://docs.rs/asi_vulkan"
-homepage = "http://plopgrizzly.com/asi_vulkan"
+homepage = "https://plopgrizzly.com/asi_vulkan"
 repository = "https://github.com/plopgrizzly/asi_vulkan"
-
 readme = "readme.md"
-description = """
-    Aldaron's System Interface / Vulkan is a library developed by Plop Grizzly
-    for interfacing with the Vulkan library.
-"""
+description = "Interface with the Vulkan library"
 keywords = ["vulkan"]
 categories = ["rendering::graphics-api", "hardware-support",
 	"api-bindings", "rendering", "external-ffi-bindings"]
 
-exclude = [
-	"examples/*", "code_of_conduct.md", "contributing.md", ".gitignore",
-	"_config.yml", "issue_template.md"
-]
-
 [dependencies]
-ami = "0.9"
+ami = "0.10"
 dl_api = "0.1"
 
 [features]
