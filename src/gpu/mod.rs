@@ -14,6 +14,7 @@ use std::{ rc::Rc, cell::RefCell };
 use awi::WindowConnection;
 
 mod surface;
+mod device;
 
 // Windows
 #[cfg(target_os = "windows")]
@@ -266,8 +267,6 @@ pub(crate) struct GpuContext {
 	pub(crate) copy_image: unsafe extern "system" fn(VkCommandBuffer, VkImage,
 		VkImageLayout, VkImage, VkImageLayout, u32, *const VkImageCopy)
 		-> (),
-	pub(crate) gpu_props: unsafe extern "system" fn(VkPhysicalDevice, VkFormat,
-		*mut VkFormatProperties) -> (),
 	pub(crate) subres_layout: unsafe extern "system" fn(VkDevice, VkImage,
 		*const VkImageSubresource, *mut VkSubresourceLayout) -> (),
 	pub(crate) new_sampler: unsafe extern "system" fn(VkDevice,
@@ -299,14 +298,12 @@ impl Gpu {
 
 		// Create Surface
 		let surface = surface::new(vk, &api, window_connection);
+		let (gpu, pqi, sampled) = device::get_gpu(vk, &api, surface)?;
+		let device = device::create_device(vk, &api, gpu, pqi);
 
 		Ok(Gpu(Rc::new(RefCell::new(GpuContext {
-			vk, surface,
+			vk, surface, gpu, pqi, sampled, device,
 			// Late inits.
-			gpu: ::std::mem::uninitialized(),
-			pqi: ::std::mem::uninitialized(),
-			sampled: ::std::mem::uninitialized(),
-			device: ::std::mem::uninitialized(),
 			command_buffer: ::std::mem::uninitialized(),
 			command_pool: ::std::mem::uninitialized(),
 			sampler: ::std::mem::uninitialized(),
@@ -368,8 +365,6 @@ impl Gpu {
 			drop_semaphore: vk_sym(vk, &api, b"vkDestroySemaphore\0")?,
 			get_next_image: vk_sym(vk, &api, b"vkAcquireNextImageKHR\0")?,
 			copy_image: vk_sym(vk, &api, b"vkCmdCopyImage\0")?,
-			gpu_props: vk_sym(vk, &api,
-				b"vkGetPhysicalDeviceFormatProperties\0")?,
 			subres_layout:
 				vk_sym(vk, &api, b"vkGetImageSubresourceLayout\0")?,
 			new_sampler: vk_sym(vk, &api, b"vkCreateSampler\0")?,
