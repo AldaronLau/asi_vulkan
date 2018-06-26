@@ -8,15 +8,12 @@
 use c_void;
 use null;
 use std::{ mem, ptr };
-use ami::Child;
 
 use VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 use VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 use Vulkan;
-use Vk;
-use VkObject;
-use VkType;
 use types::*;
+use std::{ rc::Rc };
 
 pub enum BufferBuilderType {
 	Uniform,
@@ -24,20 +21,26 @@ pub enum BufferBuilderType {
 }
 
 /// A buffer in GPU memory.
-pub struct Buffer(pub(crate)Child<Vulkan, VkObject>);
+#[derive(Clone)] pub struct Buffer(Rc<BufferContext>);
+
+struct BufferContext {
+	buffer: u64,
+	memory: u64,
+	vulkan: Vulkan,
+}
 
 impl Buffer {
 	/// Create a new buffer on the GPU.
 	#[inline(always)]
-	pub fn new<T: Clone>(vulkan: &mut Vk, data: &[T], bbt: BufferBuilderType)
+	pub fn new<T: Clone>(vulkan: &mut Vulkan, data: &[T], bbt: BufferBuilderType)
 		-> Buffer
 	{
 		let mut buffer = unsafe { mem::uninitialized() };
 		let mut memory = unsafe { mem::uninitialized() };
 		let mut mem_reqs = unsafe { mem::uninitialized() };
 		unsafe {
-			(vulkan.0.data().new_buffer)(
-				vulkan.0.data().device,
+			(vulkan.get().new_buffer)(
+				vulkan.get().device,
 				&VkBufferCreateInfo {
 					s_type: VkStructureType::BufferCreateInfo,
 					next: ptr::null(),
@@ -60,39 +63,43 @@ impl Buffer {
 		}
 		// memory requirements
 		unsafe {
-			(vulkan.0.data().get_bufmemreq)(
-				vulkan.0.data().device,
+			(vulkan.get().get_bufmemreq)(
+				vulkan.get().device,
 				buffer,
 				&mut mem_reqs
 			);
 		}
 		// memory
 		unsafe {
-			(vulkan.0.data().mem_allocate)(
-				vulkan.0.data().device,
+			let memory_type_index = ::get_memory_type(
+				vulkan,
+				mem_reqs.memory_type_bits,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+				VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+			);
+
+			(vulkan.get().mem_allocate)(
+				vulkan.get().device,
 				&VkMemoryAllocateInfo {
 					s_type: VkStructureType::MemoryAllocateInfo,
 					next: ptr::null(),
 					allocation_size: mem_reqs.size,
-					memory_type_index: ::get_memory_type(
-						vulkan,
-						mem_reqs.memory_type_bits,
-						VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-						VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
+					memory_type_index,
 				},
 				ptr::null(),
 				&mut memory
 			).unwrap();
-			(vulkan.0.data().bind_buffer_mem)(
-				vulkan.0.data().device,
+			(vulkan.get().bind_buffer_mem)(
+				vulkan.get().device,
 				buffer,
 				memory,
 				0
 			).unwrap();
 		}
 
-		let buffer = Buffer(Child::new(&vulkan.0, VkObject::new(
-			VkType::Buffer, buffer, memory, 0)));
+		let buffer = Buffer(Rc::new(BufferContext {
+			vulkan: vulkan.clone(), buffer, memory 
+		}));
 
 		buffer.update(data, vulkan);
 
@@ -100,18 +107,18 @@ impl Buffer {
 	}
 
 	pub fn memory(&self) -> u64 {
-		self.0.data().image().1
+		self.0.memory
 	}
 
 	pub fn buffer(&self) -> u64 {
-		self.0.data().image().0
+		self.0.buffer
 	}
 
 	/// Update the contents of the memory.
 	#[inline(always)] pub fn update<T: Clone>(&self, data: &[T],
-		vulkan: &mut Vk)
+		vulkan: &mut Vulkan)
 	{
-		let c = vulkan.0.data();
+		let c = vulkan.get();
 
 		let mut mapped: *mut T = unsafe { mem::uninitialized() };
 
@@ -134,10 +141,13 @@ impl Buffer {
 	}
 }
 
-#[inline(always)] pub(crate) fn destroy(buffer: (u64, u64), c: &mut Vulkan){
-	// Run Drop Function
-	unsafe {
-		(c.drop_buffer)(c.device, buffer.0, null());
-		(c.drop_memory)(c.device, buffer.1, null());
+impl Drop for BufferContext {
+	fn drop(&mut self) {
+		let vulkan = self.vulkan.get();
+
+		unsafe {
+			(vulkan.drop_buffer)(vulkan.device,self.buffer,null());
+			(vulkan.drop_memory)(vulkan.device,self.memory,null());
+		}
 	}
 }

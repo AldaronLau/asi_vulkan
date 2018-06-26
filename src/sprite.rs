@@ -7,45 +7,48 @@
 
 use null;
 use mem;
-use ami::Child;
 
 use types::*;
 use FogUniform;
 use TransformUniform;
 use Style;
 use memory::{ Buffer, BufferBuilderType, Memory };
-use Vk;
 use Vulkan;
-use VkObject;
-use VkType;
 use Image;
+use std::{ rc::Rc };
 
 /// A render-able instance.
 pub struct Sprite {
-	pub(crate) desc_set: Child<Vulkan, VkObject>,
+	desc_set: Rc<SpriteContext>,
 	// TODO: pub's?
 	pub uniform_memory: Buffer,
 	pub pipeline: VkPipeline,
 	pub pipeline_layout: VkPipelineLayout,
 }
 
+struct SpriteContext {
+	desc_set: u64,
+	desc_pool: u64,
+	vulkan: Vulkan,
+}
+
 impl Sprite {
 	/// Create a new sprite.
-	pub unsafe fn new<T>(vulkan: &mut Vk, pipeline: &Style,
+	pub unsafe fn new<T>(vulkan: &mut Vulkan, pipeline: &Style,
 		buffer_data: T,
 		camera_memory: &Memory<TransformUniform>,
 		effect_memory: Option<&Memory<FogUniform>>,
 		texture: Option<&Image>, tex_count: bool)
 		 -> Self where T: Clone
 	{
-	//	let connection = vulkan.0.data();
+	//	let connection = vulkan.get();
 
 		let mut desc_pool = mem::uninitialized();
 		let mut desc_set = mem::uninitialized();
 
 		// Descriptor Pool
-		(vulkan.0.data().new_descpool)(
-			vulkan.0.data().device,
+		(vulkan.get().new_descpool)(
+			vulkan.get().device,
 			// TODO: based on new_pipeline()
 			&VkDescriptorPoolCreateInfo {
 				s_type: VkStructureType::DescriptorPoolCreateInfo,
@@ -87,8 +90,8 @@ impl Sprite {
 			&mut desc_pool
 		).unwrap();
 
-		(vulkan.0.data().new_descsets)(
-			vulkan.0.data().device,
+		(vulkan.get().new_descsets)(
+			vulkan.get().device,
 			&VkDescriptorSetAllocateInfo {
 				s_type: VkStructureType::DescriptorSetAllocateInfo,
 				next: null(),
@@ -103,26 +106,27 @@ impl Sprite {
 		let uniform_memory = Buffer::new(vulkan, &[buffer_data],
 			BufferBuilderType::Uniform);
 
-		let device = vulkan.0.data().device;
+		let device = vulkan.get().device;
 
 		txuniform(vulkan, device, desc_set, tex_count, texture,
 			&uniform_memory, camera_memory, effect_memory);
 
 		Sprite {
 			uniform_memory: uniform_memory,
-			desc_set: Child::new(&vulkan.0, VkObject::new(
-				VkType::Sprite, desc_set, desc_pool, 0)),
+			desc_set: Rc::new(SpriteContext {
+				desc_set, desc_pool, vulkan: vulkan.clone(),
+			}),
 			pipeline: pipeline.style().0/*pipeline*/,
 			pipeline_layout: pipeline.style().1/*pipeline_layout*/,
 		}
 	}
 
 	pub/* TODO: (crate)*/ fn handles(&self) -> (u64, u64) {
-		self.desc_set.data().image()
+		(self.desc_set.desc_set, self.desc_set.desc_pool)
 	}
 }
 
-unsafe fn txuniform(vulkan: &mut Vk, device: VkDevice,
+unsafe fn txuniform(vulkan: &mut Vulkan, device: VkDevice,
 	desc_set: VkDescriptorSet, hastex: bool, texture: Option<&Image>,
 	matrix_memory: &Buffer,
 	camera_memory: &Memory<TransformUniform>,
@@ -137,7 +141,7 @@ unsafe fn txuniform(vulkan: &mut Vk, device: VkDevice,
 	}
 
 	if hastex {
-		writer = writer.sampler(desc_set, vulkan.0.data().sampler,
+		writer = writer.sampler(desc_set, vulkan.get().sampler,
 			texture.unwrap().view());
 	}
 
@@ -186,10 +190,10 @@ impl DescriptorSetWriter {
 
 	/// Update the descriptor sets.
 	#[inline(always)]
-	pub fn update_descriptor_sets(&self, connection: &mut Vk,
+	pub fn update_descriptor_sets(&self, connection: &mut Vulkan,
 		device: VkDevice) -> ()
 	{
-		let connection = connection.0.data();
+		let connection = connection.get();
 
 		let mut buffer_infos: [VkDescriptorBufferInfo; 255] = unsafe {
 			mem::uninitialized()
@@ -261,9 +265,12 @@ enum Set {
 	Sampler(VkDescriptorSet, VkSampler, VkImageView),
 }
 
-#[inline(always)] pub(crate) fn destroy(desc: (u64, u64), c: &mut Vulkan) {
-	// Run Drop Function
-	unsafe {
-		(c.drop_descpool)(c.device, desc.1, null());
+impl Drop for SpriteContext {
+	fn drop(&mut self) {
+		let vk = self.vulkan.get();
+
+		unsafe {
+			(vk.drop_descpool)(vk.device, self.desc_pool, null());
+		}
 	}
 }

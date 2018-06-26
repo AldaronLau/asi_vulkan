@@ -6,39 +6,35 @@
 // https://www.boost.org/LICENSE_1_0.txt)
 
 use null;
-use ami::Child;
 use std::mem;
 
 use Vulkan;
-use Vk;
-use VkObject;
-use VkType;
 use types::*;
+use std::{ rc::Rc };
 
-pub struct Fence(pub(crate)Child<Vulkan, VkObject>);
+/// A `VkFence` (TODO)
+#[derive(Clone)] pub struct Fence(Rc<FenceContext>);
+
+struct FenceContext {
+	fence: u64,
+	vulkan: Vulkan,
+}
 
 impl Fence {
-	pub fn new(connection: &mut Vk) -> Self {
-		let fence = VkObject::new(VkType::Fence,
-			unsafe { create_fence(connection) }, 0, 0);
-
-		Fence(Child::new(&connection.0, fence))
+	pub fn new(connection: &mut Vulkan) -> Self {
+		Fence(Rc::new(FenceContext {
+			fence: unsafe { create_fence(connection) },
+			vulkan: connection.clone()
+		}))
 	}
 
 	pub fn fence(&self) -> u64 {
-		self.0.data().fence()
+		self.0.fence
 	}
 }
 
-#[inline(always)] pub(crate) fn destroy(fence: u64, c: &mut Vulkan){
-	// Run Drop Function
-	unsafe {
-		(c.destroy_fence)(c.device, fence, null());
-	}
-}
-
-unsafe fn create_fence(connection: &mut Vk) -> VkFence {
-	let connection = connection.0.data();
+unsafe fn create_fence(connection: &mut Vulkan) -> VkFence {
+	let connection = connection.get();
 
 	let mut fence = mem::uninitialized();
 
@@ -54,4 +50,14 @@ unsafe fn create_fence(connection: &mut Vk) -> VkFence {
 	).unwrap();
 
 	fence
+}
+
+impl Drop for FenceContext {
+	fn drop(&mut self) {
+		let vk = self.vulkan.get();
+
+		unsafe {
+			(vk.destroy_fence)(vk.device, self.fence, null());
+		}
+	}
 }

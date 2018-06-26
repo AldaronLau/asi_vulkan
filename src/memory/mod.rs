@@ -5,12 +5,11 @@
 // (See accompanying file LICENSE_1_0.txt or copy at
 // https://www.boost.org/LICENSE_1_0.txt)
 
-use Vk;
+use Vulkan;
 
 mod buffer;
 
 pub use self::buffer::{ Buffer, BufferBuilderType };
-pub(crate) use self::buffer::destroy;
 
 // TODO: is needed?  Probably just use buffer instead.
 pub struct Memory<T> where T: Clone {
@@ -21,7 +20,7 @@ pub struct Memory<T> where T: Clone {
 impl<T> Memory<T> where T: Clone {
 	/// Allocate memory in a GPU buffer.
 	#[inline(always)]
-	pub fn new(vulkan: &mut Vk, data: T) -> Memory<T> {
+	pub fn new(vulkan: &mut Vulkan, data: T) -> Memory<T> {
 //		let c = vulkan.0.data();
 
 		let buffer = buffer::Buffer::new(vulkan,
@@ -33,7 +32,7 @@ impl<T> Memory<T> where T: Clone {
 
 	/// Update the contents of the memory.
 	#[inline(always)]
-	pub fn update(&self, vulkan: &mut Vk) {
+	pub fn update(&self, vulkan: &mut Vulkan) {
 		self.buffer.update(&[self.data.clone()], vulkan);
 	}
 }

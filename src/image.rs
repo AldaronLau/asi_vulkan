@@ -7,31 +7,35 @@
 
 use std::mem;
 use std::ptr::{ null };
-use ami::Child;
 
-use VkObject;
-use VkType;
 use Vulkan;
-use Vk;
 use types::*;
 use get_memory_type;
+use std::{ rc::Rc };
 
 /// An Image
-pub struct Image(pub(crate)Child<Vulkan, VkObject>);
+#[derive(Clone)] pub struct Image(Rc<ImageContext>);
+
+struct ImageContext {
+	image: u64,
+	memory: u64,
+	view: u64,
+	vulkan: Vulkan,
+}
 
 impl Image {
 	/// Create a new image.
-	#[inline(always)] pub fn new(vulkan: &mut Vk, width: u32, height: u32,
+	#[inline(always)] pub fn new(vulkan: &mut Vulkan, width: u32, height: u32,
 		format: VkFormat, tiling: VkImageTiling, usage: VkImageUsage,
 		initial_layout: VkImageLayout, reqs_mask: VkFlags,
 		samples: VkSampleCount) -> Image
 	{ unsafe {
 		let mut image = mem::uninitialized();
-		let mut image_memory = mem::uninitialized();
+		let mut memory = mem::uninitialized();
 		let mut memory_reqs = mem::uninitialized();
 
-		(vulkan.0.data().create_image)(
-			vulkan.0.data().device,
+		(vulkan.get().create_image)(
+			vulkan.get().device,
 			&VkImageCreateInfo {
 				s_type: VkStructureType::ImageCreateInfo,
 				p_next: null(),
@@ -57,39 +61,42 @@ impl Image {
 			&mut image
 		).unwrap();
 
-		(vulkan.0.data().get_imgmemreq)(vulkan.0.data().device, image,
+		(vulkan.get().get_imgmemreq)(vulkan.get().device, image,
 			&mut memory_reqs);
 
-		(vulkan.0.data().mem_allocate)(
-			vulkan.0.data().device,
+		let memory_type_index = get_memory_type(
+			vulkan,
+			memory_reqs.memory_type_bits,
+			reqs_mask
+		);
+
+		(vulkan.get().mem_allocate)(
+			vulkan.get().device,
 			&VkMemoryAllocateInfo {
 				s_type: VkStructureType::MemoryAllocateInfo,
 				next: null(),
 				allocation_size: memory_reqs.size,
-				memory_type_index: get_memory_type(
-					vulkan,
-					memory_reqs.memory_type_bits,
-					reqs_mask
-				),
+				memory_type_index,
 			},
 			null(),
-			&mut image_memory
+			&mut memory
 		).unwrap();
 
-		(vulkan.0.data().bind_imgmem)(vulkan.0.data().device, image,
-			image_memory, 0).unwrap();
+		(vulkan.get().bind_imgmem)(vulkan.get().device, image,
+			memory, 0).unwrap();
 
-		let image_view = ::create_img_view(vulkan, image,
+		let view = ::create_img_view(vulkan, image,
 			format.clone(),
 			usage != VkImageUsage::DepthStencilAttachmentBit
 		);
 
-		Image(Child::new(&vulkan.0, VkObject::new(VkType::Image, image,
-			image_memory, image_view)))
+		Image(Rc::new(ImageContext {
+			vulkan: vulkan.clone(), image, memory, view
+		}))
 	} }
 
 	pub (crate) fn image(&self) -> (u64, u64, u64) {
-		self.0.data().style()
+		(self.0.image, self.0.memory, self.0.view)
 	}
 
 	/// Get the memory handle for this image.
@@ -103,11 +110,14 @@ impl Image {
 	}
 }
 
-#[inline(always)] pub(crate) fn destroy(image: (u64, u64, u64), c: &mut Vulkan){
-	// Run Drop Function
-	unsafe {
-		(c.drop_image)(c.device, image.0, null());
-		(c.drop_memory)(c.device, image.1, null());
-		(c.drop_imgview)(c.device, image.2, null());
+impl Drop for ImageContext {
+	fn drop(&mut self) {
+		let vk = self.vulkan.get();
+
+		unsafe {
+			(vk.drop_image)(vk.device, self.image, null());
+			(vk.drop_memory)(vk.device, self.memory, null());
+			(vk.drop_imgview)(vk.device, self.view, null());
+		}
 	}
 }

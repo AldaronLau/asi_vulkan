@@ -5,22 +5,26 @@
 // (See accompanying file LICENSE_1_0.txt or copy at
 // https://www.boost.org/LICENSE_1_0.txt)
 
-use ami::Child;
 use null;
 use mem;
 
 use Vulkan;
-use Vk;
 use VK_SAMPLE_COUNT;
 use ShaderModule;
 use types::*;
-use VkType;
-use VkObject;
+use std::{ rc::Rc };
 
-pub struct Style(Child<Vulkan, VkObject>);
+pub struct Style(Rc<StyleContext>);
+
+struct StyleContext {
+	pipeline: u64,
+	pipeline_layout: u64,
+	descsetlayout: u64,
+	vulkan: Vulkan,
+}
 
 impl Style {
-	pub fn new(connection: &mut Vk, render_pass: VkRenderPass, width: u32,
+	pub fn new(connection: &mut Vulkan, render_pass: VkRenderPass, width: u32,
 		height: u32, vertex: &ShaderModule, fragment: &ShaderModule,
 		ntextures: u32, nvbuffers: u32, alpha: bool) -> Self
 	{
@@ -29,15 +33,15 @@ impl Style {
 	}
 
 	pub (crate) fn style(&self) -> (u64, u64, u64) {
-		self.0.data().style()
+		(self.0 .pipeline, self.0 .pipeline_layout, self.0 .descsetlayout)
 	}
 }
 
-pub fn new_pipeline(vulkan: &mut Vk, render_pass: VkRenderPass, width: u32,
+pub fn new_pipeline(vulkan: &mut Vulkan, render_pass: VkRenderPass, width: u32,
 	height: u32, vertex: &ShaderModule, fragment: &ShaderModule,
 	ntextures: u32, nvbuffers: u32, alpha: bool) -> Style
 { unsafe {
-	let connection = vulkan.0.data();
+	let connection = vulkan.get();
 
 	let mut pipeline = mem::uninitialized();
 	let mut pipeline_layout = mem::uninitialized();
@@ -318,15 +322,21 @@ pub fn new_pipeline(vulkan: &mut Vk, render_pass: VkRenderPass, width: u32,
 		&mut pipeline
 	).unwrap();
 
-	Style(Child::new(&vulkan.0, VkObject::new(VkType::Style, pipeline,
-		pipeline_layout, descsetlayout)))
+	Style(Rc::new(StyleContext {
+		pipeline, pipeline_layout, descsetlayout, vulkan: vulkan.clone()
+	}))
 }}
 
-#[inline(always)] pub(crate) fn destroy(style: (u64, u64, u64), c: &mut Vulkan){
-	// Run Drop Function
-	unsafe {
-		(c.drop_pipeline)(c.device, style.0, null());
-		(c.drop_pipeline_layout)(c.device, style.1, null());
-		(c.drop_descset_layout)(c.device, style.2, null());
+impl Drop for StyleContext {
+	fn drop(&mut self) {
+		let vk = self.vulkan.get();
+
+		unsafe {
+			(vk.drop_pipeline)(vk.device, self.pipeline, null());
+			(vk.drop_pipeline_layout)(vk.device,
+				self.pipeline_layout, null());
+			(vk.drop_descset_layout)(vk.device, self.descsetlayout,
+				null());
+		}
 	}
 }

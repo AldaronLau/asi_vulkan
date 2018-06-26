@@ -12,7 +12,7 @@ use std::{ mem, ptr::{ null_mut } };
 
 use vulkan;
 use types::*;
-use Vk;
+use Vulkan;
 
 #[cfg(unix)] #[repr(C)]
 struct SurfaceCreateInfoXcb {
@@ -42,13 +42,13 @@ struct SurfaceCreateInfoAndroid {
 }
 
 #[cfg(not(unix))]
-pub fn new_surface_xcb(_: &mut Vk, _: *mut c_void, _: u32) {
+pub fn new_surface_xcb(_: &mut Vulkan, _: *mut c_void, _: u32) {
 	panic!("Can't create XCB surface on not Unix.");
 }
 
 #[cfg(unix)]
-pub fn new_surface_xcb(c: &mut Vk, wc: *mut c_void, w: u32) {
-	let c = c.0.data();
+pub fn new_surface_xcb(c: &mut Vulkan, wc: *mut c_void, w: u32) {
+	let mut c = c.get_mut();
 	let mut surface = unsafe { mem::uninitialized() };
 	let surface_create_info = SurfaceCreateInfoXcb {
 		s_type: VkStructureType::SurfaceCreateInfoXcb,
@@ -65,7 +65,7 @@ pub fn new_surface_xcb(c: &mut Vk, wc: *mut c_void, w: u32) {
 		surface: *mut VkSurfaceKHR) -> VkResult
 		= unsafe
 	{
-		vulkan::sym(c, b"vkCreateXcbSurfaceKHR\0")
+		vulkan::sym(&c, b"vkCreateXcbSurfaceKHR\0").unwrap()
 	};
 
 	unsafe {
@@ -78,13 +78,13 @@ pub fn new_surface_xcb(c: &mut Vk, wc: *mut c_void, w: u32) {
 }
 
 #[cfg(not(target_os = "windows"))]
-pub fn new_surface_windows(_: &mut Vk, _: *mut c_void, _: *mut c_void) {
+pub fn new_surface_windows(_: &mut Vulkan, _: *mut c_void, _: *mut c_void) {
 	panic!("Can't create Windows surface on not Windows.");
 }
 
 #[cfg(target_os = "windows")]
-pub fn new_surface_windows(c: &mut Vk, wc: *mut c_void, w: *mut c_void) {
-	let c = c.0.data();
+pub fn new_surface_windows(c: &mut Vulkan, wc: *mut c_void, w: *mut c_void) {
+	let c = c.get();
 	let mut surface = unsafe { mem::uninitialized() };
 	let surface_create_info = SurfaceCreateInfoWindows {
 		s_type: VkStructureType::SurfaceCreateInfoWindows,
@@ -101,7 +101,7 @@ pub fn new_surface_windows(c: &mut Vk, wc: *mut c_void, w: *mut c_void) {
 		surface: *mut VkSurfaceKHR) -> VkResult
 		= unsafe
 	{
-		vulkan::sym(c, b"vkCreateWin32SurfaceKHR\0")
+		vulkan::sym(c, b"vkCreateWin32SurfaceKHR\0").unwrap()
 	};
 
 	unsafe {
