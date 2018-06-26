@@ -8,7 +8,7 @@
 use null;
 use mem;
 
-use Vulkan;
+use Gpu;
 use VK_SAMPLE_COUNT;
 use ShaderModule;
 use types::*;
@@ -20,11 +20,11 @@ struct StyleContext {
 	pipeline: u64,
 	pipeline_layout: u64,
 	descsetlayout: u64,
-	vulkan: Vulkan,
+	vulkan: Gpu,
 }
 
 impl Style {
-	pub fn new(connection: &mut Vulkan, render_pass: VkRenderPass, width: u32,
+	pub fn new(connection: &mut Gpu, render_pass: VkRenderPass, width: u32,
 		height: u32, vertex: &ShaderModule, fragment: &ShaderModule,
 		ntextures: u32, nvbuffers: u32, alpha: bool) -> Self
 	{
@@ -37,7 +37,7 @@ impl Style {
 	}
 }
 
-pub fn new_pipeline(vulkan: &mut Vulkan, render_pass: VkRenderPass, width: u32,
+pub fn new_pipeline(vulkan: &mut Gpu, render_pass: VkRenderPass, width: u32,
 	height: u32, vertex: &ShaderModule, fragment: &ShaderModule,
 	ntextures: u32, nvbuffers: u32, alpha: bool) -> Style
 { unsafe {

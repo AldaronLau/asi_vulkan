@@ -8,7 +8,7 @@
 use null;
 use std::mem;
 
-use Vulkan;
+use Gpu;
 use types::*;
 use std::{ rc::Rc };
 
@@ -17,11 +17,11 @@ use std::{ rc::Rc };
 
 struct FenceContext {
 	fence: u64,
-	vulkan: Vulkan,
+	vulkan: Gpu,
 }
 
 impl Fence {
-	pub fn new(connection: &mut Vulkan) -> Self {
+	pub fn new(connection: &mut Gpu) -> Self {
 		Fence(Rc::new(FenceContext {
 			fence: unsafe { create_fence(connection) },
 			vulkan: connection.clone()
@@ -33,7 +33,7 @@ impl Fence {
 	}
 }
 
-unsafe fn create_fence(connection: &mut Vulkan) -> VkFence {
+unsafe fn create_fence(connection: &mut Gpu) -> VkFence {
 	let connection = connection.get();
 
 	let mut fence = mem::uninitialized();

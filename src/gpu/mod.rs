@@ -11,6 +11,9 @@ use c_void;
 use types::*;
 
 use std::{ rc::Rc, cell::RefCell };
+use awi::WindowConnection;
+
+mod surface;
 
 // Windows
 #[cfg(target_os = "windows")]
@@ -52,13 +55,13 @@ unsafe fn vkd_sym<T>(device: VkDevice, vkdsym: unsafe extern "system" fn(
 	mem::transmute_copy::<*mut c_void, T>(&fn_ptr)
 }
 
-pub(crate) unsafe fn sym<T>(vk: &VulkanContext, name: &[u8])
+pub(crate) unsafe fn sym<T>(vk: &GpuContext, name: &[u8])
 	-> Result<T, String>
 {
 	vk_sym(vk.vk, &vk.api, name)
 }
 
-pub(crate) unsafe fn dsym<T>(vk: &VulkanContext, name: &[u8]) -> T {
+pub(crate) unsafe fn dsym<T>(vk: &GpuContext, name: &[u8]) -> T {
 	vkd_sym(vk.device, vk.vkdsym, name)
 }
 
@@ -131,10 +134,10 @@ dl_api!(VulkanApi, DL,
 );
 
 /// The Vulkan context.
-#[derive(Clone)] pub struct Vulkan(Rc<RefCell<VulkanContext>>);
+#[derive(Clone)] pub struct Gpu(Rc<RefCell<GpuContext>>);
 
 /// The Vulkan context.
-pub struct VulkanContext {
+pub(crate) struct GpuContext {
 	pub(crate) vk: VkInstance,
 	pub(crate) surface: VkSurfaceKHR,
 	pub(crate) gpu: VkPhysicalDevice,
@@ -285,20 +288,21 @@ pub struct VulkanContext {
 	pub(crate) wait_idle: unsafe extern "system" fn(VkDevice) -> VkResult,
 }
 
-impl Vulkan {
-	pub fn new() -> Result<Vulkan, String> { unsafe {
+impl Gpu {
+	pub fn new(window_connection: WindowConnection) -> Result<Gpu, String> { unsafe {
 		// Load the Vulkan library
-		// TODO: use ? syntax
 		let api = VulkanApi::new()?;
 
 		let vk = create_instance(
 			vk_sym(mem::zeroed(), &api, b"vkCreateInstance\0")?
 		);
 
-		Ok(Vulkan(Rc::new(RefCell::new(VulkanContext {
-			vk,
+		// Create Surface
+		let surface = surface::new(vk, &api, window_connection);
+
+		Ok(Gpu(Rc::new(RefCell::new(GpuContext {
+			vk, surface,
 			// Late inits.
-			surface: ::std::mem::uninitialized(),
 			gpu: ::std::mem::uninitialized(),
 			pqi: ::std::mem::uninitialized(),
 			sampled: ::std::mem::uninitialized(),
@@ -382,11 +386,11 @@ impl Vulkan {
 		}))))
 	} }
 
-	pub(crate) fn get(&self) -> std::cell::Ref<VulkanContext> {
+	pub(crate) fn get(&self) -> std::cell::Ref<GpuContext> {
 		self.0.borrow()
 	}
 
-	pub(crate) fn get_mut(&self) -> std::cell::RefMut<VulkanContext> {
+	pub(crate) fn get_mut(&self) -> std::cell::RefMut<GpuContext> {
 		self.0.borrow_mut()
 	}
 
@@ -396,7 +400,7 @@ impl Vulkan {
 	}
 }
 
-impl Drop for VulkanContext {
+impl Drop for GpuContext {
 	fn drop(&mut self) -> () {
 		// Load Function (Sampler)
 		type VkDestroySampler = unsafe extern "system" fn(

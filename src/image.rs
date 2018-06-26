@@ -8,7 +8,7 @@
 use std::mem;
 use std::ptr::{ null };
 
-use Vulkan;
+use Gpu;
 use types::*;
 use get_memory_type;
 use std::{ rc::Rc };
@@ -20,12 +20,12 @@ struct ImageContext {
 	image: u64,
 	memory: u64,
 	view: u64,
-	vulkan: Vulkan,
+	vulkan: Gpu,
 }
 
 impl Image {
 	/// Create a new image.
-	#[inline(always)] pub fn new(vulkan: &mut Vulkan, width: u32, height: u32,
+	#[inline(always)] pub fn new(vulkan: &mut Gpu, width: u32, height: u32,
 		format: VkFormat, tiling: VkImageTiling, usage: VkImageUsage,
 		initial_layout: VkImageLayout, reqs_mask: VkFlags,
 		samples: VkSampleCount) -> Image

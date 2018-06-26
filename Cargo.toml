@@ -33,6 +33,7 @@ categories = ["rendering::graphics-api", "hardware-support",
 
 [dependencies]
 dl_api = "0.2"
+awi = "0.7"
 
 [features]
 default = [] # ["checks"] # Un-comment for validation layers.

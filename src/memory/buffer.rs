@@ -11,7 +11,7 @@ use std::{ mem, ptr };
 
 use VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 use VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-use Vulkan;
+use Gpu;
 use types::*;
 use std::{ rc::Rc };
 
@@ -26,13 +26,13 @@ pub enum BufferBuilderType {
 struct BufferContext {
 	buffer: u64,
 	memory: u64,
-	vulkan: Vulkan,
+	vulkan: Gpu,
 }
 
 impl Buffer {
 	/// Create a new buffer on the GPU.
 	#[inline(always)]
-	pub fn new<T: Clone>(vulkan: &mut Vulkan, data: &[T], bbt: BufferBuilderType)
+	pub fn new<T: Clone>(vulkan: &mut Gpu, data: &[T], bbt: BufferBuilderType)
 		-> Buffer
 	{
 		let mut buffer = unsafe { mem::uninitialized() };
@@ -116,7 +116,7 @@ impl Buffer {
 
 	/// Update the contents of the memory.
 	#[inline(always)] pub fn update<T: Clone>(&self, data: &[T],
-		vulkan: &mut Vulkan)
+		vulkan: &mut Gpu)
 	{
 		let c = vulkan.get();
 
