@@ -25,7 +25,7 @@ struct ImageContext {
 
 impl Image {
 	/// Create a new image.
-	#[inline(always)] pub fn new(vulkan: &mut Gpu, width: u32, height: u32,
+	#[inline(always)] pub fn new(vulkan: &Gpu, width: u32, height: u32,
 		format: VkFormat, tiling: VkImageTiling, usage: VkImageUsage,
 		initial_layout: VkImageLayout, reqs_mask: VkFlags,
 		samples: VkSampleCount) -> Image

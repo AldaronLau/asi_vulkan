@@ -26,7 +26,7 @@ pub(crate) type VkPipelineLayout = u64;
 pub type VkImageView = u64;
 pub type VkBuffer = u64;
 pub(crate) type VkFence = u64;
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSwapchainKHR(pub(crate) u64);
+pub type VkSwapchainKHR = u64;
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkRenderPass(pub(crate) u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkFramebuffer(pub(crate) u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSemaphore(pub(crate)  u64);

@@ -24,12 +24,12 @@ struct StyleContext {
 }
 
 impl Style {
-	pub fn new(connection: &mut Gpu, render_pass: VkRenderPass, width: u32,
-		height: u32, vertex: &ShaderModule, fragment: &ShaderModule,
-		ntextures: u32, nvbuffers: u32, alpha: bool) -> Self
+	pub fn new(connection: &mut Gpu, render_pass: VkRenderPass,
+		vertex: &ShaderModule, fragment: &ShaderModule, ntextures: u32,
+		nvbuffers: u32, alpha: bool) -> Self
 	{
-		new_pipeline(connection, render_pass, width, height, vertex,
-			fragment, ntextures, nvbuffers, alpha)
+		new_pipeline(connection, render_pass, vertex, fragment,
+			ntextures, nvbuffers, alpha)
 	}
 
 	pub (crate) fn style(&self) -> (u64, u64, u64) {
@@ -37,9 +37,9 @@ impl Style {
 	}
 }
 
-pub fn new_pipeline(vulkan: &mut Gpu, render_pass: VkRenderPass, width: u32,
-	height: u32, vertex: &ShaderModule, fragment: &ShaderModule,
-	ntextures: u32, nvbuffers: u32, alpha: bool) -> Style
+pub fn new_pipeline(vulkan: &mut Gpu, render_pass: VkRenderPass,
+	vertex: &ShaderModule, fragment: &ShaderModule, ntextures: u32,
+	nvbuffers: u32, alpha: bool) -> Style
 { unsafe {
 	let connection = vulkan.get();
 
@@ -228,19 +228,10 @@ pub fn new_pipeline(vulkan: &mut Gpu, render_pass: VkRenderPass, width: u32,
 				s_type: VkStructureType::PipelineViewportStateCreateInfo,
 				next: null(),
 				flags: 0,
-				viewport_count: 1,
-				viewports: &VkViewport {
-					x: 0.0, y: 0.0,
-					width: width as f32,
-					height: height as f32,
-					min_depth: 0.0,
-					max_depth: 1.0,
-				},
-				scissor_count: 1,
-				scissors: &VkRect2D {
-					offset: VkOffset2D { x: 0, y: 0 },
-					extent: VkExtent2D { width, height },
-				},
+				viewport_count: 0,
+				viewports: null(),
+				scissor_count: 0,
+				scissors: null(),
 			},
 			rasterization_state: &VkPipelineRasterizationStateCreateInfo {
 				s_type: VkStructureType::PipelineRasterizationStateCreateInfo,

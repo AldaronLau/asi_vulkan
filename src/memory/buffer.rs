@@ -32,7 +32,7 @@ struct BufferContext {
 impl Buffer {
 	/// Create a new buffer on the GPU.
 	#[inline(always)]
-	pub fn new<T: Clone>(vulkan: &mut Gpu, data: &[T], bbt: BufferBuilderType)
+	pub fn new<T: Clone>(vulkan: &Gpu, data: &[T], bbt: BufferBuilderType)
 		-> Buffer
 	{
 		let mut buffer = unsafe { mem::uninitialized() };
@@ -116,7 +116,7 @@ impl Buffer {
 
 	/// Update the contents of the memory.
 	#[inline(always)] pub fn update<T: Clone>(&self, data: &[T],
-		vulkan: &mut Gpu)
+		vulkan: &Gpu)
 	{
 		let c = vulkan.get();
 

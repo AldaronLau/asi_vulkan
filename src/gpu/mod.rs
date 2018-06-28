@@ -11,10 +11,15 @@ use c_void;
 use types::*;
 
 use std::{ rc::Rc, cell::RefCell };
-use awi::WindowConnection;
+use awi;
+use awi::afi::Graphic;
+use Vec3;
 
 mod surface;
 mod device;
+mod queue;
+mod command_pool;
+mod sampler;
 
 // Windows
 #[cfg(target_os = "windows")]
@@ -44,26 +49,22 @@ pub(crate) unsafe fn vk_sym<T>(vk: VkInstance, lib: &VulkanApi, name: &[u8])
 }
 
 unsafe fn vkd_sym<T>(device: VkDevice, vkdsym: unsafe extern "system" fn(
-	VkDevice, *const i8) -> *mut c_void, name: &[u8]) -> T
+	VkDevice, *const i8) -> *mut c_void, name: &[u8]) -> Result<T, String>
 {
 	let fn_ptr = vkdsym(device, &name[0] as *const _ as *const i8);
 
 	if fn_ptr.is_null() {
-		panic!("couldn't load symbol {}!", std::str::from_utf8(name)
-			.unwrap());
+		Err(format!("couldn't load symbol {}!",
+			std::str::from_utf8(name).unwrap()))
+	} else {
+		Ok(mem::transmute_copy::<*mut c_void, T>(&fn_ptr))
 	}
-
-	mem::transmute_copy::<*mut c_void, T>(&fn_ptr)
 }
 
 pub(crate) unsafe fn sym<T>(vk: &GpuContext, name: &[u8])
 	-> Result<T, String>
 {
 	vk_sym(vk.vk, &vk.api, name)
-}
-
-pub(crate) unsafe fn dsym<T>(vk: &GpuContext, name: &[u8]) -> T {
-	vkd_sym(vk.device, vk.vkdsym, name)
 }
 
 unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
@@ -142,14 +143,15 @@ pub(crate) struct GpuContext {
 	pub(crate) vk: VkInstance,
 	pub(crate) surface: VkSurfaceKHR,
 	pub(crate) gpu: VkPhysicalDevice,
-	pub(crate) pqi: u32,
+	pub(crate) swapchain: VkSwapchainKHR,
 	pub(crate) sampled: bool,
 	pub(crate) device: VkDevice,
+	pub(crate) present_queue: VkQueue,
 	pub(crate) command_buffer: VkCommandBuffer,
 	pub(crate) command_pool: u64,
 	pub(crate) sampler: VkSampler,
+	pub(crate) rgb: Vec3,
 	pub(crate) api: VulkanApi,
-	pub(crate) vkdsym: unsafe extern "system" fn(VkDevice, *const i8) -> *mut c_void,
 	pub(crate) mapmem: unsafe extern "system" fn(VkDevice, VkDeviceMemory,
 		VkDeviceSize, VkDeviceSize, VkFlags, *mut *mut c_void)
 		-> VkResult,
@@ -269,9 +271,6 @@ pub(crate) struct GpuContext {
 		-> (),
 	pub(crate) subres_layout: unsafe extern "system" fn(VkDevice, VkImage,
 		*const VkImageSubresource, *mut VkSubresourceLayout) -> (),
-	pub(crate) new_sampler: unsafe extern "system" fn(VkDevice,
-		*const VkSamplerCreateInfo, *const c_void, *mut VkSampler)
-		-> VkResult,
 	pub(crate) get_surface_capabilities: unsafe extern "system" fn(VkPhysicalDevice,
 		VkSurfaceKHR, *mut VkSurfaceCapabilitiesKHR) -> VkResult,
 	pub(crate) begin_render: unsafe extern "system" fn(VkCommandBuffer,
@@ -288,7 +287,10 @@ pub(crate) struct GpuContext {
 }
 
 impl Gpu {
-	pub fn new(window_connection: WindowConnection) -> Result<Gpu, String> { unsafe {
+	/// Create the GPU context, and optionally a window to render to.
+	pub fn new(window: Option<(&str, &Graphic)>, rgb: Vec3)
+		-> Result<(Gpu, awi::Window), String>
+	{ unsafe {
 		// Load the Vulkan library
 		let api = VulkanApi::new()?;
 
@@ -297,89 +299,110 @@ impl Gpu {
 		);
 
 		// Create Surface
-		let surface = surface::new(vk, &api, window_connection);
+		let window = window.unwrap();
+		let window = awi::Window::new(window.0, window.1, None);
+		let surface = surface::new(vk, &api, window.get_connection());
 		let (gpu, pqi, sampled) = device::get_gpu(vk, &api, surface)?;
 		let device = device::create_device(vk, &api, gpu, pqi);
+		// Null swapchain.
+		let swapchain = 0;
+		// Device's loader
+		let vkdsym: unsafe extern "system" fn(VkDevice, *const i8)
+			-> *mut c_void
+			= vk_sym(vk, &api, b"vkGetDeviceProcAddr\0")?;
+		// Create present queue.
+		let present_queue = queue::new((device, vkdsym), pqi)?;
+		// Create command buffer.
+		let (command_buffer, command_pool)
+			= command_pool::new((device, vkdsym), pqi)?;
+		// Finish connection with the texture sampler.
+		let sampler = sampler::new((device, vkdsym))?;
 
-		Ok(Gpu(Rc::new(RefCell::new(GpuContext {
-			vk, surface, gpu, pqi, sampled, device,
-			// Late inits.
-			command_buffer: ::std::mem::uninitialized(),
-			command_pool: ::std::mem::uninitialized(),
-			sampler: ::std::mem::uninitialized(),
-			vkdsym: vk_sym(vk, &api, b"vkGetDeviceProcAddr\0")?,
-			mapmem: vk_sym(vk, &api, b"vkMapMemory\0")?,
-			draw: vk_sym(vk, &api, b"vkCmdDraw\0")?,
-			unmap: vk_sym(vk, &api, b"vkUnmapMemory\0")?,
-			new_swapchain: vk_sym(vk, &api, b"vkCreateSwapchainKHR\0")?,
-			get_swapcount: vk_sym(vk, &api, b"vkGetSwapchainImagesKHR\0")?,
-			create_fence: vk_sym(vk, &api, b"vkCreateFence\0")?,
-			begin_cmdbuff: vk_sym(vk, &api, b"vkBeginCommandBuffer\0")?,
-			pipeline_barrier: vk_sym(vk, &api, b"vkCmdPipelineBarrier\0")?,
-			end_cmdbuff: vk_sym(vk, &api, b"vkEndCommandBuffer\0")?,
-			queue_submit: vk_sym(vk, &api, b"vkQueueSubmit\0")?,
-			wait_fence: vk_sym(vk, &api, b"vkWaitForFences\0")?,
-			reset_fence: vk_sym(vk, &api, b"vkResetFences\0")?,
-			reset_cmdbuff: vk_sym(vk, &api, b"vkResetCommandBuffer\0")?,
-			create_imgview: vk_sym(vk, &api, b"vkCreateImageView\0")?,
+		Ok((Gpu(Rc::new(RefCell::new(GpuContext {
+			vk, surface, gpu, sampled, device, rgb, swapchain,
+			present_queue, command_buffer, command_pool, sampler,
+			// TODO: use vkd_sym.
+			mapmem: vkd_sym(device, vkdsym, b"vkMapMemory\0")?,
+			draw: vkd_sym(device, vkdsym, b"vkCmdDraw\0")?,
+			unmap: vkd_sym(device, vkdsym, b"vkUnmapMemory\0")?,
+			new_swapchain: vkd_sym(device, vkdsym, b"vkCreateSwapchainKHR\0")?,
+			get_swapcount: vkd_sym(device, vkdsym, b"vkGetSwapchainImagesKHR\0")?,
+			create_fence: vkd_sym(device, vkdsym, b"vkCreateFence\0")?,
+			begin_cmdbuff: vkd_sym(device, vkdsym, b"vkBeginCommandBuffer\0")?,
+			pipeline_barrier: vkd_sym(device, vkdsym, b"vkCmdPipelineBarrier\0")?,
+			end_cmdbuff: vkd_sym(device, vkdsym, b"vkEndCommandBuffer\0")?,
+			queue_submit: vkd_sym(device, vkdsym, b"vkQueueSubmit\0")?,
+			wait_fence: vkd_sym(device, vkdsym, b"vkWaitForFences\0")?,
+			reset_fence: vkd_sym(device, vkdsym, b"vkResetFences\0")?,
+			reset_cmdbuff: vkd_sym(device, vkdsym, b"vkResetCommandBuffer\0")?,
+			create_imgview: vkd_sym(device, vkdsym, b"vkCreateImageView\0")?,
 			get_memprops: vk_sym(vk, &api,
 				b"vkGetPhysicalDeviceMemoryProperties\0")?,
-			create_image: vk_sym(vk, &api, b"vkCreateImage\0")?,
+			create_image: vkd_sym(device, vkdsym, b"vkCreateImage\0")?,
 			get_imgmemreq: vk_sym(vk, &api,
 				b"vkGetImageMemoryRequirements\0")?,
-			mem_allocate: vk_sym(vk, &api, b"vkAllocateMemory\0")?,
-			bind_imgmem: vk_sym(vk, &api, b"vkBindImageMemory\0")?,
-			new_renderpass: vk_sym(vk, &api, b"vkCreateRenderPass\0")?,
-			create_framebuffer: vk_sym(vk, &api, b"vkCreateFramebuffer\0")?,
-			drop_framebuffer: vk_sym(vk, &api, b"vkDestroyFramebuffer\0")?,
-			drop_imgview: vk_sym(vk, &api, b"vkDestroyImageView\0")?,
-			drop_renderpass: vk_sym(vk, &api, b"vkDestroyRenderPass\0")?,
-			drop_image: vk_sym(vk, &api, b"vkDestroyImage\0")?,
-			drop_buffer: vk_sym(vk, &api, b"vkDestroyBuffer\0")?,
-			drop_memory: vk_sym(vk, &api, b"vkFreeMemory\0\0")?,
-			drop_swapchain: vk_sym(vk, &api, b"vkDestroySwapchainKHR\0")?,
-			update_descsets: vk_sym(vk, &api, b"vkUpdateDescriptorSets\0")?,
-			drop_descpool: vk_sym(vk, &api, b"vkDestroyDescriptorPool\0")?,
-			bind_buffer_mem: vk_sym(vk, &api, b"vkBindBufferMemory\0")?,
+			mem_allocate: vkd_sym(device, vkdsym, b"vkAllocateMemory\0")?,
+			bind_imgmem: vkd_sym(device, vkdsym, b"vkBindImageMemory\0")?,
+			new_renderpass: vkd_sym(device, vkdsym, b"vkCreateRenderPass\0")?,
+			create_framebuffer: vkd_sym(device, vkdsym, b"vkCreateFramebuffer\0")?,
+			drop_framebuffer: vkd_sym(device, vkdsym, b"vkDestroyFramebuffer\0")?,
+			drop_imgview: vkd_sym(device, vkdsym, b"vkDestroyImageView\0")?,
+			drop_renderpass: vkd_sym(device, vkdsym, b"vkDestroyRenderPass\0")?,
+			drop_image: vkd_sym(device, vkdsym, b"vkDestroyImage\0")?,
+			drop_buffer: vkd_sym(device, vkdsym, b"vkDestroyBuffer\0")?,
+			drop_memory: vkd_sym(device, vkdsym, b"vkFreeMemory\0\0")?,
+			drop_swapchain: vkd_sym(device, vkdsym, b"vkDestroySwapchainKHR\0")?,
+			update_descsets: vkd_sym(device, vkdsym, b"vkUpdateDescriptorSets\0")?,
+			drop_descpool: vkd_sym(device, vkdsym, b"vkDestroyDescriptorPool\0")?,
+			bind_buffer_mem: vkd_sym(device, vkdsym, b"vkBindBufferMemory\0")?,
 			get_bufmemreq: vk_sym(vk, &api,
 				b"vkGetBufferMemoryRequirements\0")?,
-			new_buffer: vk_sym(vk, &api, b"vkCreateBuffer\0")?,
-			new_descpool: vk_sym(vk, &api, b"vkCreateDescriptorPool\0")?,
-			new_descsets: vk_sym(vk, &api, b"vkAllocateDescriptorSets\0")?,
-			new_shademod: vk_sym(vk, &api, b"vkCreateShaderModule\0")?,
-			drop_shademod: vk_sym(vk, &api, b"vkDestroyShaderModule\0")?,
-			new_pipeline: vk_sym(vk, &api, b"vkCreateGraphicsPipelines\0")?,
-			drop_pipeline: vk_sym(vk, &api, b"vkDestroyPipeline\0")?,
+			new_buffer: vkd_sym(device, vkdsym, b"vkCreateBuffer\0")?,
+			new_descpool: vkd_sym(device, vkdsym, b"vkCreateDescriptorPool\0")?,
+			new_descsets: vkd_sym(device, vkdsym, b"vkAllocateDescriptorSets\0")?,
+			new_shademod: vkd_sym(device, vkdsym, b"vkCreateShaderModule\0")?,
+			drop_shademod: vkd_sym(device, vkdsym, b"vkDestroyShaderModule\0")?,
+			new_pipeline: vkd_sym(device, vkdsym, b"vkCreateGraphicsPipelines\0")?,
+			drop_pipeline: vkd_sym(device, vkdsym, b"vkDestroyPipeline\0")?,
 			new_pipeline_layout:
-				vk_sym(vk, &api, b"vkCreatePipelineLayout\0")?,
+				vkd_sym(device, vkdsym, b"vkCreatePipelineLayout\0")?,
 			drop_pipeline_layout: vk_sym(vk, &api,
 				b"vkDestroyPipelineLayout\0")?,
 			new_descset_layout:
-				vk_sym(vk, &api, b"vkCreateDescriptorSetLayout\0")?,
+				vkd_sym(device, vkdsym, b"vkCreateDescriptorSetLayout\0")?,
 			drop_descset_layout: vk_sym(vk, &api,
 				b"vkDestroyDescriptorSetLayout\0")?,
-			bind_vb: vk_sym(vk, &api, b"vkCmdBindVertexBuffers\0")?,
-			bind_pipeline: vk_sym(vk, &api, b"vkCmdBindPipeline\0")?,
-			bind_descsets: vk_sym(vk, &api, b"vkCmdBindDescriptorSets\0")?,
-			new_semaphore: vk_sym(vk, &api, b"vkCreateSemaphore\0")?,
-			drop_semaphore: vk_sym(vk, &api, b"vkDestroySemaphore\0")?,
-			get_next_image: vk_sym(vk, &api, b"vkAcquireNextImageKHR\0")?,
-			copy_image: vk_sym(vk, &api, b"vkCmdCopyImage\0")?,
+			bind_vb: vkd_sym(device, vkdsym, b"vkCmdBindVertexBuffers\0")?,
+			bind_pipeline: vkd_sym(device, vkdsym, b"vkCmdBindPipeline\0")?,
+			bind_descsets: vkd_sym(device, vkdsym, b"vkCmdBindDescriptorSets\0")?,
+			new_semaphore: vkd_sym(device, vkdsym, b"vkCreateSemaphore\0")?,
+			drop_semaphore: vkd_sym(device, vkdsym, b"vkDestroySemaphore\0")?,
+			get_next_image: vkd_sym(device, vkdsym, b"vkAcquireNextImageKHR\0")?,
+			copy_image: vkd_sym(device, vkdsym, b"vkCmdCopyImage\0")?,
 			subres_layout:
-				vk_sym(vk, &api, b"vkGetImageSubresourceLayout\0")?,
-			new_sampler: vk_sym(vk, &api, b"vkCreateSampler\0")?,
+				vkd_sym(device, vkdsym, b"vkGetImageSubresourceLayout\0")?,
 			get_surface_capabilities: vk_sym(vk, &api,
 				b"vkGetPhysicalDeviceSurfaceCapabilitiesKHR\0")?,
-			begin_render: vk_sym(vk, &api, b"vkCmdBeginRenderPass\0")?,
-			set_viewport: vk_sym(vk, &api, b"vkCmdSetViewport\0")?,
-			set_scissor: vk_sym(vk, &api, b"vkCmdSetScissor\0")?,
-			end_render_pass: vk_sym(vk, &api, b"vkCmdEndRenderPass\0")?,
-			destroy_fence: vk_sym(vk, &api, b"vkDestroyFence\0")?,
-			queue_present: vk_sym(vk, &api, b"vkQueuePresentKHR\0")?,
-			wait_idle: vk_sym(vk, &api, b"vkDeviceWaitIdle\0")?,
+			begin_render: vkd_sym(device, vkdsym, b"vkCmdBeginRenderPass\0")?,
+			set_viewport: vkd_sym(device, vkdsym, b"vkCmdSetViewport\0")?,
+			set_scissor: vkd_sym(device, vkdsym, b"vkCmdSetScissor\0")?,
+			end_render_pass: vkd_sym(device, vkdsym, b"vkCmdEndRenderPass\0")?,
+			destroy_fence: vkd_sym(device, vkdsym, b"vkDestroyFence\0")?,
+			queue_present: vkd_sym(device, vkdsym, b"vkQueuePresentKHR\0")?,
+			wait_idle: vkd_sym(device, vkdsym, b"vkDeviceWaitIdle\0")?,
 			api,
-		}))))
+		}))), window))
 	} }
+
+	/// Set the clear color.
+	pub fn color(&self, rgb: Vec3) {
+		self.get_mut().rgb = rgb;
+	}
+
+	/// Update
+	pub fn update(&self, draw: &FnOnce() -> ()) {
+		
+	}
 
 	pub(crate) fn get(&self) -> std::cell::Ref<GpuContext> {
 		self.0.borrow()

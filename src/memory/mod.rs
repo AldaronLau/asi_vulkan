@@ -20,7 +20,7 @@ pub struct Memory<T> where T: Clone {
 impl<T> Memory<T> where T: Clone {
 	/// Allocate memory in a GPU buffer.
 	#[inline(always)]
-	pub fn new(vulkan: &mut Gpu, data: T) -> Memory<T> {
+	pub fn new(vulkan: &Gpu, data: T) -> Memory<T> {
 //		let c = vulkan.0.data();
 
 		let buffer = buffer::Buffer::new(vulkan,
@@ -32,7 +32,7 @@ impl<T> Memory<T> where T: Clone {
 
 	/// Update the contents of the memory.
 	#[inline(always)]
-	pub fn update(&self, vulkan: &mut Gpu) {
+	pub fn update(&self, vulkan: &Gpu) {
 		self.buffer.update(&[self.data.clone()], vulkan);
 	}
 }

@@ -21,7 +21,7 @@ struct FenceContext {
 }
 
 impl Fence {
-	pub fn new(connection: &mut Gpu) -> Self {
+	pub fn new(connection: &Gpu) -> Self {
 		Fence(Rc::new(FenceContext {
 			fence: unsafe { create_fence(connection) },
 			vulkan: connection.clone()
@@ -33,7 +33,7 @@ impl Fence {
 	}
 }
 
-unsafe fn create_fence(connection: &mut Gpu) -> VkFence {
+unsafe fn create_fence(connection: &Gpu) -> VkFence {
 	let connection = connection.get();
 
 	let mut fence = mem::uninitialized();

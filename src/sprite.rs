@@ -34,7 +34,7 @@ struct SpriteContext {
 
 impl Sprite {
 	/// Create a new sprite.
-	pub unsafe fn new<T>(vulkan: &mut Gpu, pipeline: &Style,
+	pub unsafe fn new<T>(vulkan: &Gpu, pipeline: &Style,
 		buffer_data: T,
 		camera_memory: &Memory<TransformUniform>,
 		effect_memory: Option<&Memory<FogUniform>>,
@@ -126,7 +126,7 @@ impl Sprite {
 	}
 }
 
-unsafe fn txuniform(vulkan: &mut Gpu, device: VkDevice,
+unsafe fn txuniform(vulkan: &Gpu, device: VkDevice,
 	desc_set: VkDescriptorSet, hastex: bool, texture: Option<&Image>,
 	matrix_memory: &Buffer,
 	camera_memory: &Memory<TransformUniform>,
@@ -190,7 +190,7 @@ impl DescriptorSetWriter {
 
 	/// Update the descriptor sets.
 	#[inline(always)]
-	pub fn update_descriptor_sets(&self, connection: &mut Gpu,
+	pub fn update_descriptor_sets(&self, connection: &Gpu,
 		device: VkDevice) -> ()
 	{
 		let connection = connection.get();
