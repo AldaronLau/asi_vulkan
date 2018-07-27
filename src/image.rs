@@ -43,8 +43,8 @@ impl Image {
 				image_type: VkImageType::Dim2d,
 				format: format.clone(),
 				extent: VkExtent3D {
-					width: width,
-					height: height,
+					width,
+					height,
 					depth: 1,
 				},
 				mip_levels: 1,

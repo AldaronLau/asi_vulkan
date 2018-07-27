@@ -23,7 +23,7 @@ struct FenceContext {
 impl Fence {
 	pub fn new(connection: &Gpu) -> Self {
 		Fence(Rc::new(FenceContext {
-			fence: unsafe { create_fence(connection) },
+			fence: unsafe { new(connection) },
 			vulkan: connection.clone()
 		}))
 	}
@@ -33,7 +33,7 @@ impl Fence {
 	}
 }
 
-unsafe fn create_fence(connection: &Gpu) -> VkFence {
+pub unsafe fn new(connection: &Gpu) -> u64 {
 	let connection = connection.get();
 
 	let mut fence = mem::uninitialized();
@@ -52,12 +52,21 @@ unsafe fn create_fence(connection: &Gpu) -> VkFence {
 	fence
 }
 
+pub unsafe fn drop(connection: &Gpu, fence: u64) {
+	let vk = connection.get();
+
+	(vk.destroy_fence)(vk.device, fence, null())
+}
+
+pub unsafe fn wait(connection: &Gpu, fence: u64) {
+	let vk = connection.get();
+
+	(vk.wait_fence)(vk.device, 1, [fence].as_ptr(), 1, ::std::u64::MAX)
+		.unwrap();
+}
+
 impl Drop for FenceContext {
 	fn drop(&mut self) {
-		let vk = self.vulkan.get();
-
-		unsafe {
-			(vk.destroy_fence)(vk.device, self.fence, null());
-		}
+		unsafe { drop(&self.vulkan, self.fence) }
 	}
 }

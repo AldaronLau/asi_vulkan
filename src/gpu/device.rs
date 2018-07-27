@@ -13,7 +13,7 @@ use std::{ mem, ptr::{ null, null_mut } };
 
 pub(super) unsafe fn get_gpu(vk: VkInstance, lib: &VulkanApi,
 	surface: VkSurfaceKHR)
-	-> Result<(VkPhysicalDevice, u32, bool), String>
+	-> Result<(VkPhysicalDevice, u32, bool, VkFormat), String>
 {
 	#[repr(C)]
 	struct VkQueueFamilyProperties {
@@ -48,6 +48,8 @@ pub(super) unsafe fn get_gpu(vk: VkInstance, lib: &VulkanApi,
 		u32, VkSurfaceKHR, *mut u32) -> VkResult;
 	type GetGpuProps = unsafe extern "system" fn(VkPhysicalDevice, VkFormat,
 		*mut VkFormatProperties) -> ();
+	type GetGpuSurfaceFormats = unsafe extern "system" fn(VkPhysicalDevice,
+		VkSurfaceKHR, *mut u32, *mut VkSurfaceFormatKHR) -> VkResult;
 
 	let vk_get_props: GetGpuQueueFamProps = gpu::vk_sym(vk, lib,
 		b"vkGetPhysicalDeviceQueueFamilyProperties\0")?;
@@ -55,6 +57,8 @@ pub(super) unsafe fn get_gpu(vk: VkInstance, lib: &VulkanApi,
 		b"vkGetPhysicalDeviceSurfaceSupportKHR\0")?;
 	let vk_gpu_props: GetGpuProps = gpu::vk_sym(vk, lib,
 		b"vkGetPhysicalDeviceFormatProperties\0")?;
+	let vk_gpu_surface_formats: GetGpuSurfaceFormats = gpu::vk_sym(vk, lib,
+		b"vkGetPhysicalDeviceSurfaceFormatsKHR\0")?;
 
 	// Process Data
 	for i in 0..(num_gpus as usize) {
@@ -81,16 +85,23 @@ pub(super) unsafe fn get_gpu(vk: VkInstance, lib: &VulkanApi,
 			if supports_present != 0 &&
 				(properties[j].queue_flags & 0x00000001) != 0
 			{
+				// Get format
+				let mut nformats = 1;
+				let mut format = mem::uninitialized();
+				vk_gpu_surface_formats(gpus[i], surface,
+					&mut nformats, &mut format).unwrap();
+				let format = format.format;
+
 				// 
 				let mut props = mem::uninitialized();
 
-				vk_gpu_props(gpus[i], VkFormat::R8g8b8a8Unorm,
-					&mut props);
+				vk_gpu_props(gpus[i], format.clone(), &mut props);
 
 				return Ok((gpus[i], k,
 					props.linear_tiling_features
 						& 0x00000001 /* sampled image */
-						!= 0
+						!= 0,
+					format
 				));
 			}
 		}

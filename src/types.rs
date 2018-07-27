@@ -27,9 +27,9 @@ pub type VkImageView = u64;
 pub type VkBuffer = u64;
 pub(crate) type VkFence = u64;
 pub type VkSwapchainKHR = u64;
+pub type VkSemaphore = u64;
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkRenderPass(pub(crate) u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkFramebuffer(pub(crate) u64);
-#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSemaphore(pub(crate)  u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub(crate) struct VkShaderModule(pub(crate) u64);
 #[repr(C)] #[derive(Copy, Clone, Debug)] pub(crate) struct VkPipelineCache(pub(crate) u64);
 
@@ -616,7 +616,7 @@ pub(crate) type VkCommandBuffer = *mut c_void;
 	pub old_swapchain: VkSwapchainKHR,
 }
 
-#[repr(C)] pub(crate) struct VkExtent2D {
+#[derive(Copy, Clone)] #[repr(C)] pub(crate) struct VkExtent2D {
 	pub width: u32,
 	pub height: u32,
 }

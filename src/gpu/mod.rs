@@ -12,7 +12,7 @@ use types::*;
 
 use std::{ rc::Rc, cell::RefCell };
 use awi;
-use awi::afi::Graphic;
+use awi::afi::Video;
 use Vec3;
 
 mod surface;
@@ -152,6 +152,8 @@ pub(crate) struct GpuContext {
 	pub(crate) sampler: VkSampler,
 	pub(crate) rgb: Vec3,
 	pub(crate) api: VulkanApi,
+	pub(crate) format: VkFormat,
+	pub(crate) extent: VkExtent2D,
 	pub(crate) mapmem: unsafe extern "system" fn(VkDevice, VkDeviceMemory,
 		VkDeviceSize, VkDeviceSize, VkFlags, *mut *mut c_void)
 		-> VkResult,
@@ -288,7 +290,7 @@ pub(crate) struct GpuContext {
 
 impl Gpu {
 	/// Create the GPU context, and optionally a window to render to.
-	pub fn new(window: Option<(&str, &Graphic)>, rgb: Vec3)
+	pub fn new(window: Option<(&str, &Video)>, rgb: Vec3)
 		-> Result<(Gpu, awi::Window), String>
 	{ unsafe {
 		// Load the Vulkan library
@@ -302,7 +304,8 @@ impl Gpu {
 		let window = window.unwrap();
 		let window = awi::Window::new(window.0, window.1, None);
 		let surface = surface::new(vk, &api, window.get_connection());
-		let (gpu, pqi, sampled) = device::get_gpu(vk, &api, surface)?;
+		let (gpu, pqi, sampled, format)
+			= device::get_gpu(vk, &api, surface)?;
 		let device = device::create_device(vk, &api, gpu, pqi);
 		// Null swapchain.
 		let swapchain = 0;
@@ -317,10 +320,12 @@ impl Gpu {
 			= command_pool::new((device, vkdsym), pqi)?;
 		// Finish connection with the texture sampler.
 		let sampler = sampler::new((device, vkdsym))?;
+		let extent = VkExtent2D { width: 0, height: 0 };
 
 		Ok((Gpu(Rc::new(RefCell::new(GpuContext {
 			vk, surface, gpu, sampled, device, rgb, swapchain,
 			present_queue, command_buffer, command_pool, sampler,
+			format, extent,
 			// TODO: use vkd_sym.
 			mapmem: vkd_sym(device, vkdsym, b"vkMapMemory\0")?,
 			draw: vkd_sym(device, vkdsym, b"vkCmdDraw\0")?,
@@ -415,6 +420,13 @@ impl Gpu {
 	/// Whether or not images are sampled.
 	pub fn sampled(&self) -> bool {
 		self.get().sampled
+	}
+
+	/// Aspect ratio
+	pub fn ar(&self) -> f32 {
+		let connection = self.get();
+
+		connection.extent.width as f32 / connection.extent.height as f32
 	}
 }
 
