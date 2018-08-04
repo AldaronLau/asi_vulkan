@@ -104,7 +104,7 @@ impl Image {
 		self.image().1
 	}
 
-	/// Get the image view for thsi image
+	/// Get the image view for this image
 	pub fn view(&self) -> u64 {
 		self.image().2
 	}

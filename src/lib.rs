@@ -235,7 +235,7 @@ pub unsafe fn drop_semaphore(connection: &Gpu, semaphore: VkSemaphore) {
 }
 
 pub unsafe fn draw_begin(connection: &Gpu, render_pass: VkRenderPass,
-	image: VkImage, frame_buffer: VkFramebuffer, r: f32, g: f32, b: f32)
+	image: VkImage, frame_buffer: VkFramebuffer)
 {
 	let connection = connection.get();
 
@@ -274,9 +274,11 @@ pub unsafe fn draw_begin(connection: &Gpu, render_pass: VkRenderPass,
 		VkPipelineStage::TopOfPipeAndColorAttachmentOutput,
 		0, 0, null(), 0, null(), 1, &layout_transition_barrier);
 
+	let rgb = connection.rgb;
+
 	// activate render pass:
 	let clear_value = [
-		VkClearValue { color: VkClearColorValue { float32: [r, g, b, 1.0] } },
+		VkClearValue { color: VkClearColorValue { float32: [rgb.x, rgb.y, rgb.z, 1.0] } },
 		VkClearValue { depth_stencil: VkClearDepthStencilValue { depth: 1.0, stencil: 0 } },
 	];
 
@@ -355,10 +357,14 @@ pub unsafe fn pipeline_barrier(connection: &Gpu, image: VkImage) {
 pub unsafe fn get_next_image(vulkan: &Gpu, fence: VkFence) -> u32 {
 	let mut image_id = mem::uninitialized();
 
-	(vulkan.get().get_next_image)(
+	match (vulkan.get().get_next_image)(
 		vulkan.get().device, vulkan.get().swapchain, u64::MAX,
 		0 /* no semaphore */, fence, &mut image_id,
-	).unwrap();
+	) {
+		VkResult::Success => { /* nothing */ }
+		VkResult::OutOfDate => { println!("Oof"); return get_next_image(vulkan, fence); }
+		a => { println!("{}", a); a.unwrap() },
+	};
 
 	image_id
 }

@@ -1341,13 +1341,13 @@ pub enum VkPresentModeKHR {
 	BadFormat = -11,
 	FragmentedPool = -12,
 	Other = -1024,
-	SurfaceLostKhr = -1000000000,
-	NativeWindowInUseKhr = -1000000001,
-	SuboptimalKhr = 1000001003,
-	OutOfDateKhr = -1000001004,
-	IncompatibleDisplayKhr = -1000003001,
-	OutOfPoolMemoryKhr = -1000069000,
-	InvalidExternalHandleKhr = -1000072003,
+	SurfaceLost = -1000000000,
+	NativeWindowInUse = -1000000001,
+	Suboptimal = 1000001003,
+	OutOfDate = -1000001004,
+	IncompatibleDisplay = -1000003001,
+	OutOfPoolMemory = -1000069000,
+	InvalidExternalHandle = -1000072003,
 }
 
 // // //
@@ -1374,6 +1374,13 @@ impl fmt::Display for VkResult {
 		VkResult::TooManyObjects => write!(f, "Too Many Objects"),
 		VkResult::BadFormat => write!(f, "Format Not Supported"),
 		VkResult::FragmentedPool => write!(f, "Fragmented Pool"),
+		VkResult::Other => write!(f, "Other"),
+		VkResult::SurfaceLost => write!(f, "Surface Lost"),
+		VkResult::NativeWindowInUse => write!(f, "Window in use"),
+		VkResult::Suboptimal => write!(f, "Suboptimal"),
+		VkResult::OutOfDate => write!(f, "Out of date"),
+		VkResult::IncompatibleDisplay => write!(f, "Bad display"),
+		VkResult::OutOfPoolMemory => write!(f, "Out of pool mem"),
 		_ => write!(f, "Unknown Error"),
 
 		}
@@ -1381,10 +1388,12 @@ impl fmt::Display for VkResult {
 }
 
 impl VkResult {
-	/// Panic with error if not `VkResult::Success` or `VkResult::Incomplete`.
-	pub fn unwrap(self) -> () {
+	#[cfg(feature = "checks")]
+	pub(crate) fn unwrap(self) -> () {
 		if self != VkResult::Success && self != VkResult::Incomplete {
 			panic!("Failed: {}", self);
 		}
 	}
+	#[cfg(not(feature = "checks"))]
+	pub(crate) fn unwrap(self) -> () {}
 }

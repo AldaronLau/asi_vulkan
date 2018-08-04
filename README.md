@@ -1,12 +1,14 @@
+[![Plop Grizzly](https://plopgrizzly.com/images/logo-bar.png)](https://plopgrizzly.com)
+
 # [Aldaron's System Interface / Vulkan](https://crates.io/crates/asi_vulkan)
-Safe inferface to Vulkan.
+Rust safe bindings for Vulkan.
+
+This project is part of [ADI](https://crates.io/crates/adi).
 
 ## Features
 * Bindings to Vulkan calls on both Unix and Windows
 * Safe bindings to some Vulkan calls
 * Unsafe bindings to some Vulkan calls
-
-## [Contributing](http://plopgrizzly.com/contributing/en#contributing)
 
 ## Roadmap to 1.0 (Future Features)
 * All bindings to Vulkan calls are safe
@@ -30,5 +32,3 @@ Safe inferface to Vulkan.
 
 ### 0.5
 * Uses sliced triangle fans now.
-
-## Developed by [Plop Grizzly](http://plopgrizzly.com)

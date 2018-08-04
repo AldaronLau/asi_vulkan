@@ -404,10 +404,10 @@ impl Gpu {
 		self.get_mut().rgb = rgb;
 	}
 
-	/// Update
+/*	/// Update
 	pub fn update(&self, draw: &FnOnce() -> ()) {
 		
-	}
+	}*/
 
 	pub(crate) fn get(&self) -> std::cell::Ref<GpuContext> {
 		self.0.borrow()

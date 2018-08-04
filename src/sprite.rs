@@ -24,6 +24,8 @@ pub struct Sprite {
 	pub uniform_memory: Buffer,
 	pub pipeline: VkPipeline,
 	pub pipeline_layout: VkPipelineLayout,
+	#[allow(unused)] // To keep in scope, preventing segfault.
+	texture: Option<Image>,
 }
 
 struct SpriteContext {
@@ -38,7 +40,7 @@ impl Sprite {
 		buffer_data: T,
 		camera_memory: &Memory<TransformUniform>,
 		effect_memory: Option<&Memory<FogUniform>>,
-		texture: Option<&Image>, tex_count: bool)
+		texture: Option<Image>, tex_count: bool)
 		 -> Self where T: Clone
 	{
 	//	let connection = vulkan.get();
@@ -108,7 +110,7 @@ impl Sprite {
 
 		let device = vulkan.get().device;
 
-		txuniform(vulkan, device, desc_set, tex_count, texture,
+		txuniform(vulkan, device, desc_set, tex_count, texture.as_ref(),
 			&uniform_memory, camera_memory, effect_memory);
 
 		Sprite {
@@ -118,6 +120,7 @@ impl Sprite {
 			}),
 			pipeline: pipeline.style().0/*pipeline*/,
 			pipeline_layout: pipeline.style().1/*pipeline_layout*/,
+			texture,
 		}
 	}
 
