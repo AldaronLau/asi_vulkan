@@ -19,6 +19,9 @@ This project is part of [ADI](https://crates.io/crates/adi).
 * Support Nintendo Switch
 
 ## Change Log
+### 0.9
+* Now works with newer versions of ADI-related libaries.
+
 ### 0.8
 * Use reference counting in std library instead of ami
 * `Vk` is now `Vulkan`
