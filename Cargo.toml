@@ -30,7 +30,7 @@ categories = ["rendering::graphics-api", "hardware-support",
 
 [dependencies]
 dl_api = "0.2"
-awi = "0.7"
+awi = "0.8"
 euler = "0.4"
 
 [features]
