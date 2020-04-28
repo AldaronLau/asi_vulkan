@@ -29,7 +29,7 @@ categories = ["rendering::graphics-api", "hardware-support",
 	"api-bindings", "rendering", "external-ffi-bindings"]
 
 [dependencies]
-dl_api = "0.2"
+dl_api = "0.3"
 awi = "0.8"
 euler = "0.4"
 
