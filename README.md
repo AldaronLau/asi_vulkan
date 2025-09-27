@@ -1,6 +1,12 @@
-[![Plop Grizzly](https://plopgrizzly.com/images/logo-bar.png)](https://plopgrizzly.com)
-
 # [Aldaron's System Interface / Vulkan](https://crates.io/crates/asi_vulkan)
+
+This project has been discontinued, I suggest you use
+[wgpu](https://crates.io/crates/wgpu) instead.
+
+Contact me at <aldaronlau@gmail.com> if you wish to reclaim the crate name.
+
+-----
+
 Rust safe bindings for Vulkan.
 
 This project is part of [ADI](https://crates.io/crates/adi).
